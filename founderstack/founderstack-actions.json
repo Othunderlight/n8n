@@ -1,5 +1,5 @@
 {
-  "name": "founderstack actions",
+  "name": "founderstack-actions",
   "nodes": [
     {
       "parameters": {
@@ -305,7 +305,7 @@
         "promptType": "define",
         "text": "={{ $json.message?.text || $json.segments?.[0]?.text || $json.content?.parts[0]?.text }}",
         "options": {
-          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person.\n6. **`query_then_action`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the action is one of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_action` composite tool**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_action` composite tool**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_action`\nTrigger: Use when UUID is missing.\n{\n  \"tool\": \"query_then_action\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"Omar Gatara\" },\n  \"action\" : {\n    \"tool_name\" : \"add_tasks_or_notes\",\n    \"payload\" : {\n      \"tasks\": [{ \"title\": \"Welcome call\", \"status\": \"Todo\" }]\n    }\n  }\n  \"message\": \"Searching for Omar to add tasks.\"\n}\n\n#### You need to respect the action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
+          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.\n6. **`query_then_action`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the action is one of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_action` composite tool**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_action` composite tool**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_action`\nTrigger: Use when UUID is missing.\n{\n  \"tool\": \"query_then_action\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"Omar Gatara\" },\n  \"action\" : {\n    \"tool_name\" : \"add_tasks_or_notes\",\n    \"payload\" : {\n      \"tasks\": [{ \"title\": \"Welcome call\", \"status\": \"Todo\" }]\n    }\n  }\n  \"message\": \"Searching for Omar to add tasks.\"\n}\n\n#### You need to respect the action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -1387,68 +1387,6 @@
     },
     {
       "parameters": {
-        "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "leftValue": "",
-                    "rightValue": "tasks",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    },
-                    "id": "07dde81a-1448-433b-af0d-6adfcaaa63e6"
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "3fb1df44-6cce-4373-b269-203a03468ee0",
-                    "leftValue": "",
-                    "rightValue": "notes",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals",
-                      "name": "filter.operator.equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.4,
-      "position": [
-        816,
-        848
-      ],
-      "id": "e2032375-c126-438b-9964-62e96b9278ae",
-      "name": "Switch3"
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://api.crm.founderstack.cloud/api/tasks/import/",
         "sendHeaders": true,
@@ -1462,6 +1400,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
+        "jsonBody": "={{ $json.tasks }}",
         "options": {}
       },
       "id": "cb5fe4ad-24c4-4bbc-af03-85410adc6164",
@@ -1469,14 +1408,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1056,
-        720
+        1376,
+        784
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.crm.founderstack.cloud/api/notes/",
+        "url": "https://api.crm.founderstack.cloud/api/notes/import/",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1488,6 +1427,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
+        "jsonBody": "={{ $json.notes }}",
         "options": {}
       },
       "id": "33bfe877-b75c-4fec-8807-a75b2667147d",
@@ -1495,8 +1435,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        1056,
-        960
+        1376,
+        1040
       ]
     },
     {
@@ -1882,9 +1822,298 @@
       ],
       "id": "aa7bb58d-1c54-4649-a0b0-04bc98942b3e",
       "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9ac1aeed-e20d-480f-b489-712ea5a641cb",
+              "leftValue": "={{ $json.fields.tasks }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        800
+      ],
+      "id": "7db27c40-f455-458e-b084-bfab159799c0",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = items[0].json.fields.tasks;\nconst personId = items[0].json.person_id;\n\nconst updatedTasks = tasks.map(task => {\n  return {\n    ...task,\n    related_person: personId\n  };\n});\n\n// Return as single item with tasks array\nreturn [{\n  json: {\n    tasks: updatedTasks\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        784
+      ],
+      "id": "7582b87b-164c-4e14-a86e-b6fe72fd82e7",
+      "name": "map tasks1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const notes = items[0].json.fields.notes;\nconst personId = items[0].json.person_id;\n\nconst updatedNotes = notes.map(note => {\n  return {\n    ...note,\n    related_person: personId\n  };\n});\n\n// Return as single item with notes array\nreturn [{\n  json: {\n    notes: updatedNotes\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        1040
+      ],
+      "id": "6d488f1e-e322-418f-b2e8-5902b974d494",
+      "name": "map notes1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9ac1aeed-e20d-480f-b489-712ea5a641cb",
+              "leftValue": "={{ $json.fields.notes }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        1056
+      ],
+      "id": "b08d6818-f423-47f8-89d2-073a1bf18ce0",
+      "name": "If6"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2064,
+        912
+      ],
+      "id": "12a7a562-c6ac-4251-b7c4-4507c5ae0723",
+      "name": "Merge8"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        912
+      ],
+      "id": "b2b8fe17-3689-4886-9a5b-e74f7b1c2d95",
+      "name": "toon conv3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"add_tasks_or_and_notes\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        912
+      ],
+      "id": "e7003a47-4788-4bd5-a425-445ed9dfca74",
+      "name": "append tool name5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean and transform task data from input\nconst items = $input.all();\nconst result = [];\nconst transformedTasks = [];\n\nfor (const item of items) {\n  // The item itself is the task object\n  const task = item.json;\n  \n  // Transform the task data\n  const transformedTask = {\n    id: task.id || '',\n    created_at: task.created_at || '',\n    updated_at: task.updated_at || '',\n    title: task.title || '',\n    description: task.description || '',\n    status: task.status || '',\n    due_date: task.due_date || ''\n  };\n  \n  transformedTasks.push(transformedTask);\n}\n\n// Add all transformed tasks to a single result object\nif (transformedTasks.length > 0) {\n  result.push({ tasks: transformedTasks });\n} else {\n  result.push({ tasks: [] });\n}\n\n// Return the transformed data\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        784
+      ],
+      "id": "1a726525-7c3b-443f-bfeb-aa1d3e1ae858",
+      "name": "get impo values"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean and transform note data from input\nconst items = $input.all();\n\n// Transform all notes into the desired format\nconst notes = items.map(item => {\n  const note = item.json;\n  return {\n    id: note.id || '',\n    created_at: note.created_at || '',\n    updated_at: note.updated_at || '',\n    title: note.title || '',\n    content: note.content || ''\n  };\n});\n\n// Return a single object with all notes in one array\nreturn [{ notes: notes }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        1040
+      ],
+      "id": "d6f4114e-fe28-4f10-9f85-52322c8f5a03",
+      "name": "get impo values2"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Merge8": [
+      {
+        "json": {
+          "tasks": [
+            {
+              "id": "2c431cd5-fdb2-497c-a153-baa6ba4b8dee",
+              "created_at": "2026-02-10T07:42:31.231566+03:00",
+              "updated_at": "2026-02-10T07:42:31.231574+03:00",
+              "title": "outreach today",
+              "description": "",
+              "status": "Todo",
+              "due_date": "2026-02-10T00:00:00+03:00"
+            },
+            {
+              "id": "9dcdb5f6-709f-4f60-a1c3-8d776a631a4b",
+              "created_at": "2026-02-10T07:42:31.233336+03:00",
+              "updated_at": "2026-02-10T07:42:31.233342+03:00",
+              "title": "search for thing we discussed in the call",
+              "description": "",
+              "status": "Todo",
+              "due_date": "2026-02-10T00:00:00+03:00"
+            }
+          ],
+          "notes": [
+            {
+              "id": "737b629a-cc6b-44df-b043-d602616e7fc9",
+              "created_at": "2026-02-10T07:42:31.290898+03:00",
+              "updated_at": "2026-02-10T07:42:31.290905+03:00",
+              "title": "Personal sentiment",
+              "content": "I don't like him"
+            }
+          ]
+        },
+        "binary": {},
+        "pairedItem": [
+          {
+            "item": 0
+          },
+          {
+            "item": 0,
+            "input": 1
+          },
+          {
+            "item": 0,
+            "input": 1
+          }
+        ]
+      }
+    ],
+    "Merge1": [
+      {
+        "json": {
+          "update_id": 365591610,
+          "message": {
+            "message_id": 42,
+            "from": {
+              "id": 5763466369,
+              "is_bot": false,
+              "first_name": "Omar",
+              "last_name": "Gatara",
+              "username": "Omar_Gatara",
+              "language_code": "en"
+            },
+            "chat": {
+              "id": 5763466369,
+              "first_name": "Omar",
+              "last_name": "Gatara",
+              "username": "Omar_Gatara",
+              "type": "private"
+            },
+            "date": 1770698550,
+            "text": "add two task to outreach today andd search for thing we diescussed iun the call for this person 8feb1565-df8f-4e6b-b140-8723821580d6 also add a note that i dont like him and another that i have to close him fast"
+          },
+          "tool_called": "add_tasks_or_and_notes",
+          "toon_output": "tasks: \n  - \n    id: 2c431cd5-fdb2-497c-a153-baa6ba4b8dee\n    created_at: 2026-02-10T07:42:31.231566+03:00\n    updated_at: 2026-02-10T07:42:31.231574+03:00\n    title: outreach today\n    description: \n    status: Todo\n    due_date: 2026-02-10T00:00:00+03:00\n  - \n    id: 9dcdb5f6-709f-4f60-a1c3-8d776a631a4b\n    created_at: 2026-02-10T07:42:31.233336+03:00\n    updated_at: 2026-02-10T07:42:31.233342+03:00\n    title: search for thing we discussed in the call\n    description: \n    status: Todo\n    due_date: 2026-02-10T00:00:00+03:00\nnotes: \n  - \n    id: 737b629a-cc6b-44df-b043-d602616e7fc9\n    created_at: 2026-02-10T07:42:31.290898+03:00\n    updated_at: 2026-02-10T07:42:31.290905+03:00\n    title: Personal sentiment\n    content: I don't like him"
+        },
+        "binary": {},
+        "pairedItem": [
+          {
+            "item": 0
+          },
+          {
+            "item": 0,
+            "input": 1
+          }
+        ]
+      }
+    ],
+    "AI Agent2": [
+      {
+        "json": {
+          "output": "{\n  \"tool\": \"send_final_msg\",\n  \"status\": \"Success\",\n  \"confidence\": 0.95,\n  \"message\": \"✅ Added 2 tasks and 1 note for the contact:\\n• Tasks: “outreach today” & “search for thing we discussed in the call” (both due today)\\n• Note: “I don’t like him”\\n\\nI didn’t see a second note (“I have to close him fast”) in the output—only one note was created.\",\n  \"reason\": null\n}"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "clean": [
+      {
+        "json": {
+          "tool": "send_final_msg",
+          "status": "Success",
+          "confidence": 0.95,
+          "message": "✅ Added 2 tasks and 1 note for the contact:\n• Tasks: “outreach today” & “search for thing we discussed in the call” (both due today)\n• Note: “I don’t like him”\n\nI didn’t see a second note (“I have to close him fast”) in the output—only one note was created.",
+          "reason": null
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Code in JavaScript": [
+      {
+        "json": {
+          "tool": "send_final_msg",
+          "status": "Success",
+          "confidence": 0.95,
+          "message": "✅ Added 2 tasks and 1 note for the contact:\n• Tasks: “outreach today” & “search for thing we discussed in the call” (both due today)\n• Note: “I don’t like him”\n\nI didn’t see a second note (“I have to close him fast”) in the output—only one note was created.",
+          "reason": null,
+          "formattedMessage": "<blockquote>Status: Success\nConfidence: 95%</blockquote>\n\n✅ Added 2 tasks and 1 note for the contact:\n• Tasks: “outreach today” & “search for thing we discussed in the call” (both due today)\n• Note: “I don’t like him”\n\nI didn’t see a second note (“I have to close him fast”) in the output—only one note was created."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
     "Switch": {
       "main": [
@@ -1918,7 +2147,12 @@
         ],
         [
           {
-            "node": "Switch3",
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If6",
             "type": "main",
             "index": 0
           }
@@ -2525,27 +2759,15 @@
         ]
       ]
     },
-    "Switch3": {
+    "add tasks": {
       "main": [
         [
           {
-            "node": "add tasks",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "add notes",
+            "node": "get impo values",
             "type": "main",
             "index": 0
           }
         ]
-      ]
-    },
-    "add tasks": {
-      "main": [
-        []
       ]
     },
     "get impo values1": {
@@ -2823,6 +3045,117 @@
           }
         ]
       ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "map tasks1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "map tasks1": {
+      "main": [
+        [
+          {
+            "node": "add tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "map notes1": {
+      "main": [
+        [
+          {
+            "node": "add notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If6": {
+      "main": [
+        [
+          {
+            "node": "map notes1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add notes": {
+      "main": [
+        [
+          {
+            "node": "get impo values2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toon conv3": {
+      "main": [
+        [
+          {
+            "node": "append tool name5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge8": {
+      "main": [
+        [
+          {
+            "node": "toon conv3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impo values": {
+      "main": [
+        [
+          {
+            "node": "Merge8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impo values2": {
+      "main": [
+        [
+          {
+            "node": "Merge8",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "append tool name5": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -2833,7 +3166,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": "YgQMQ2K8IXbIqztxtd-Mr"
   },
-  "versionId": "d66fc818-6ad1-4693-a070-f683ad733413",
+  "versionId": "0fccf2de-b12c-4f43-8d7e-c513769f4313",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "65d1a339b442578b9f48438a32f521de239e91fb025b2f8c26e5d9e359ded7b8"

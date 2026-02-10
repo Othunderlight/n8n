@@ -143,7 +143,7 @@
                   {
                     "id": "b59a668f-3b79-4625-a67a-987a969b77ca",
                     "leftValue": "={{ $json.tool }}",
-                    "rightValue": "query_then_action",
+                    "rightValue": "query_then_actions",
                     "operator": {
                       "type": "string",
                       "operation": "equals",
@@ -305,7 +305,7 @@
         "promptType": "define",
         "text": "={{ $json.message?.text || $json.segments?.[0]?.text || $json.content?.parts[0]?.text }}",
         "options": {
-          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.\n6. **`query_then_action`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the action is one of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_action` composite tool**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_action` composite tool**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_action`\nTrigger: Use when UUID is missing.\n{\n  \"tool\": \"query_then_action\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"Omar Gatara\" },\n  \"action\" : {\n    \"tool_name\" : \"add_tasks_or_notes\",\n    \"payload\" : {\n      \"tasks\": [{ \"title\": \"Welcome call\", \"status\": \"Todo\" }]\n    }\n  }\n  \"message\": \"Searching for Omar to add tasks.\"\n}\n\n#### You need to respect the action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
+          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.\n6. **`query_then_actions`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the actions is one or a set of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_actions` composite tools**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_actions` composite tools**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_actions\n`\nTrigger: Use when UUID is missing. the tool can make multiple actions\n\n{\n  \"tool\": \"query_then_actions\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"omar gatara\" },\n  \"actions\": [\n    {\n      \"tool_name\": \"update_person\",\n      \"payload\": {\n        \"fields\": {\n          \"core\": { \"stage\": \"Negotiation\" },\n          \"company\": { \"name\": \"New Company Ltd\" }\n        }\n      }\n    },\n    {\n      \"tool_name\": \"add_tasks_or_notes\",\n      \"payload\": {\n        \"tasks\": [\n          {\n            \"title\": \"Book celebratory dinner\",\n            \"description\": \"description if any\",\n            \"status\": \"Todo\",\n            \"due_date\": \"2026-02-11\"\n          }\n        ],\n        \"notes\": [\n          {\n            \"title\": \"Promotion\",\n            \"content\": \"Updated role to CEO after recent news.\",\n            \"type\": \"note\",\n            \"date\": \"2026-02-10\"\n          }\n        ]\n      }\n    }\n  ],\n  \"message\": \"Searching for [Person] to do the [Actions]\"\n}\n\n#### You need to respect each action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -359,13 +359,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Function to format dates to \"MMM DD, YYYY\" (e.g., Dec 31, 2025)\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// Process the incoming items\nlet allResults = [];\n\nfor (const item of items) {\n  const results = item.json.results || [];\n  \n  // 1. Filter out items in trash\n  // 2. Map to the clean structure\n  const filteredAndFormatted = results\n    .filter(page => page.in_trash === false)\n    .map(page => {\n      const props = page.properties;\n\n      return {\n        json: {\n          // Root level fields\n          id: page.id,\n          url: page.url, // <--- Added the Notion URL here\n          created_time: formatDate(page.created_time),\n          last_edited_time: formatDate(page.last_edited_time),\n\n          // Properties\n          industry: props.Industry?.select?.name || null,\n          email: props.Email?.email || null,\n          linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n          phone: props.Phone?.phone_number || null,\n          \n          // Rich Text (joined into strings)\n          notes: props.Notes?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          tags: props.Tags?.multi_select.map(s => s.name).join(\", \") || \"\",\n          \n          status: props.Status?.status?.name || null,\n          last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n          context: props.Context?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          job_title: props[\"Job Title\"]?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n          enriched: props.Enriched?.checkbox || false,\n          company: props.Company?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          location: props.Location?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          name: props.Name?.title.map(t => t.plain_text).join(\"\") || \"\"\n        }\n      };\n    });\n\n  allResults.push(...filteredAndFormatted);\n}\n\nreturn allResults;"
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        1296
+        1296,
+        1488
       ],
       "id": "91fa0232-2288-4e45-a147-92f67470e8c3",
       "name": "get important values1",
@@ -373,13 +373,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get all items passed to the node\nconst allItems = items;\n\n// This will store each formatted record string\nlet combinedToon = [];\n\nallItems.forEach((item, index) => {\n  const obj = item.json;\n  let recordLines = [];\n  \n  // Start the record with the number (e.g., 1:)\n  recordLines.push(`${index + 1}:`);\n\n  for (const [key, value] of Object.entries(obj)) {\n    // Handling empty or null values gracefully\n    const displayValue = (value === null || value === \"\" || value === undefined) ? \"N/A\" : value;\n    \n    // Indent the keys for better readability under the record number\n    recordLines.push(`  ${key}: ${displayValue}`);\n  }\n  \n  // Join the lines for this specific record and add it to our array\n  combinedToon.push(recordLines.join('\\n'));\n});\n\n// Return a SINGLE item containing all records joined by double newlines\nreturn [\n  {\n    json: {\n      toon_output: combinedToon.join('\\n\\n')\n    }\n  }\n];"
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1520,
-        1296
+        1552,
+        1488
       ],
       "id": "c6d34899-e733-4a09-b876-c9d1c68d085d",
       "name": "toon conv2"
@@ -387,10 +387,10 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=User: {{ $json.message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called }}\nTool Output: {{ $json.toon_output }}\nRequesting permition to call the update_person tool",
+        "text": "=User: {{ $json.usr_message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called }}\nTool Output: {{ $json.toon_output }}\nRequesting permition to call the following tools: \n{{ \n  $json.actions.map(action => \"- \" + action.tool_name).join('\\n')\n}}\n\nPayload for each tool in the same order: \n{{ \n  $json.actions.map(action => \"\" + JSON.stringify(action.payload, null, 2)).join('\\n\\n')\n}}",
         "needsFallback": true,
         "options": {
-          "systemMessage": "=You are the **CRM Entity Resolver**.\n\nYou receive:\n* The original user request\n* Query results from the CRM\n\nYour job is to decide whether it is safe to proceed.\n\n---\n\n### Hard Rules (VERY IMPORTANT)\n\n* You DO NOT execute tools directly.\n* You DO NOT modify data.\n* You ONLY decide **one of these outcomes**:\n\n  1. Execute with resolved ID\n  2. Refuse to execute (with reason)\n\n---\n\n### Decision Criteria\n\nYou may consider:\n* Name similarity\n* Company match\n* Job title relevance\n* Context alignment\n* Recency of last contact\n\n---\n\n### Allowed Decisions\n\nYou must return **one and only one** of the following:\n\n{\n  \"decision\": \"execute\",\n  \"confidence\": 0.82,\n  \"page_id\": \"resolved-page-id\",\n  \"reason\": \"Strong name + company + role match\"\n}\n\nOR\n\n{\n  \"decision\": \"refuse\",\n  \"confidence\": 0.45,\n  \"reason\": \"Multiple similar names, insufficient context to disambiguate safely\"\n}\n\n\n---\n\n### Absolute Prohibitions\n\n* Never guess an ID\n* Never say “probably”\n* Never allow execution if confidence < 0.7\n"
+          "systemMessage": "=You are the **CRM Entity Resolver**.\n\nYou receive:\n* The original user request\n* Query results from the CRM\n\nYour job is to decide whether it is safe to proceed.\n\n---\n\n### Hard Rules (VERY IMPORTANT)\n\n* You DO NOT execute tools directly.\n* You DO NOT modify data.\n* You ONLY decide **one of these outcomes**:\n\n  1. Execute with resolved ID\n  2. Refuse to execute (with reason)\n\n---\n\n### PRACTICAL MATCHING GUIDELINES\nWhen evaluating matches, apply real-world human logic:\n\n##### Name Matching (Be Flexible)\n- Allow for common spelling variations (Abdulalh/Abdallah, John/Jon, Steven/Stephen)\n- Allow for phonetic similarity (Katrina/Catrina, Sean/Shawn)\n- Allow for missing or extra spaces/middle initials\n- Consider nickname variations (William/Bill, Robert/Bob, Richard/Dick)\n\n### Decision Criteria (Be Flexible)\nYou may consider:\n* Name similarity\n* Company match\n* Job title relevance\n* Context alignment\n* Recency of last contact\n\n---\n\n### Allowed Decisions\n\nYou must return **one and only one** of the following:\n\n{\n  \"decision\": \"execute\",\n  \"confidence\": 0.82,\n  \"person_id\": \"resolved-person-id\",\n  \"reason\": \"Strong name + company + role match\"\n}\n\nOR\n\n{\n  \"decision\": \"refuse\",\n  \"confidence\": 0.45,\n  \"reason\": \"Multiple similar names, insufficient context to disambiguate safely\"\n}\n\n\n---\n\n### Absolute Prohibitions\n\n* Never guess an ID\n* Never say “probably”\n* Never allow execution if confidence < 0.7\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -505,21 +505,9 @@
     },
     {
       "parameters": {
-        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4128,
-        1312
-      ],
-      "id": "14855ebc-d3a9-4eff-85eb-54c87715854d",
-      "name": "to TOON2"
-    },
-    {
-      "parameters": {
         "mode": "combine",
-        "combineBy": "combineAll",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
         "options": {}
       },
       "type": "n8n-nodes-base.merge",
@@ -540,8 +528,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        4448,
-        -1104
+        7056,
+        -1088
       ],
       "id": "aa0c1c27-5bd3-4efc-9abf-6d5c62b2cf55",
       "name": "Merge1"
@@ -558,8 +546,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        5904,
-        -1104
+        8512,
+        -1088
       ],
       "id": "84693328-277f-4e21-a7c3-c38ebe12340d",
       "name": "Send a text message2",
@@ -578,8 +566,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5648,
-        -1104
+        8256,
+        -1088
       ],
       "id": "d0cc7f51-16ba-4137-b0ad-0b3e3b3fc1d8",
       "name": "Code in JavaScript"
@@ -804,7 +792,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=User: {{ $json.message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called || 'None' }}\nTool Output: {{ $json.toon_output || 'None' }}\nReason: {{ $json.reason || 'None' }}",
+        "text": "=User: {{ $json.message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called || 'None' }}\nTools Output:\n{{ \n  Object.keys($json)\n    .filter(key => key.includes('toon'))\n    .map(key => \"- \" + key + \": \" + $json[key])\n    .join('\\n\\n')\n}}\n\nReason: {{ $json.reason || 'None' }}",
         "options": {
           "systemMessage": "=# 🧠 PROMPT 3 — FINAL AI (Validator / Narrator)\n\nYou are the **Final CRM Communicator**.\n\nYou receive:\n* Tool execution results (or none)\n* Errors (if any)\n* Resolver decisions\n\nYour job is to:\n* Validate what actually happened\n* Communicate clearly to the user\n* Never hallucinate success\n\n---\n\n### Hard Rules\n\n* If **no execution output exists** → status MUST be `\"Failure\"`\n* Never say an update happened unless verified\n* Always explain failure reasons clearly\n* Be concise, confident, and human\n* URL Inclusion: If the tool output contains a person_url or similar profile link, you must include it in your final message to the user.\n\n---\n\n### Output Tool\n\nAlways respond using `send_final_msg`.\n\nExample (success):\n\n{\n  \"tool\": \"send_final_msg\",\n  \"status\": \"Success\",\n  \"confidence\": 0.9,\n  \"message\": \"✅ Oram Ahmed’s profile was updated: Job Title set to VP of Sales.\",\n  \"reason\": null\n}\n\nExample (failure):\n\n{\n  \"tool\": \"send_final_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ I found multiple similar contacts and couldn’t confidently determine the correct one.\",\n  \"reason\": \"Ambiguous match; no safe resolution\"\n}\n"
         }
@@ -812,8 +800,8 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        4912,
-        -1104
+        7520,
+        -1088
       ],
       "id": "f5c8aeef-88da-4a8e-8d2f-d9dc0ac25f7e",
       "name": "AI Agent2"
@@ -826,8 +814,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
       "position": [
-        5040,
-        -768
+        7648,
+        -752
       ],
       "id": "554387a1-b84d-4fb0-a399-b55cca1c5e02",
       "name": "Google Gemini Chat Model2",
@@ -846,8 +834,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
-        4816,
-        -816
+        7424,
+        -800
       ],
       "id": "0ae336fd-d76c-45ad-93ba-cf16437c8376",
       "name": "Groq Chat Model2",
@@ -917,8 +905,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1744,
-        1296
+        1808,
+        1488
       ],
       "id": "6bbc2c8e-4d08-4cc3-a0a3-78feb7199775",
       "name": "append tool name4"
@@ -938,33 +926,20 @@
     },
     {
       "parameters": {
-        "jsCode": "// Function to format dates to \"MMM DD, YYYY\"\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// n8n uses $input.all() to get incoming data\nconst items = $input.all();\nlet allResults = [];\n\nfor (const item of items) {\n  const page = item.json;\n  \n  // Skip if in trash\n  if (page.in_trash) continue;\n\n  const props = page.properties || {};\n\n  // Map to clean structure\n  allResults.push({\n    id: page.id,\n    notion_url: page.url,\n    created_time: formatDate(page.created_time),\n    last_edited_time: formatDate(page.last_edited_time),\n\n    // Properties\n    industry: props.Industry?.select?.name || null,\n    email: props.Email?.email || null,\n    linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n    phone: props.Phone?.phone_number || null,\n    \n    // Rich Text & Title (using .map and .join safely)\n    notes: (props.Notes?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    tags: (props.Tags?.multi_select || []).map(s => s.name).join(\", \"),\n    \n    status: props.Status?.status?.name || null,\n    last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n    context: (props.Context?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    job_title: (props[\"Job Title\"]?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n    enriched: props.Enriched?.checkbox || false,\n    company: (props.Company?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    location: (props.Location?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    name: (props.Name?.title || []).map(t => t.plain_text).join(\"\")\n  });\n}\n\n// Return as objects; n8n will wrap them in .json automatically\nreturn allResults;"
+        "jsCode": "\n// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"query_then_update_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3952,
-        1312
-      ],
-      "id": "a3c57a24-430d-4e17-807f-2f23e2fc35ae",
-      "name": "get impor valiues"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"query_then_update_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();\nreturn $input.all();"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4336,
-        1312
+        6912,
+        944
       ],
       "id": "48f0f2ca-863f-42dd-ba06-25c092d2508a",
       "name": "Code in JavaScript3"
     },
     {
       "parameters": {
-        "jsCode": "// Function to recursively crawl the object and lowercase \"contains\" values\nfunction lowercaseContains(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseContains(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'contains' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseContains(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseContains(item.json)\n  };\n});"
+        "jsCode": "// Function to recursively crawl the object and lowercase \"search\" values\nfunction lowercaseSearch(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseSearch(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'search' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseSearch(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseSearch(item.json)\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -977,13 +952,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Function to recursively crawl the object and lowercase \"contains\" values\nfunction lowercaseContains(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseContains(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'contains' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseContains(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseContains(item.json)\n  };\n});"
+        "jsCode": "// Function to recursively crawl the object and lowercase \"search\" values\nfunction lowercaseSearch(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseSearch(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'search' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseSearch(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseSearch(item.json)\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        800,
-        1408
+        768,
+        1488
       ],
       "id": "7dc5705a-157c-4b70-8d86-6a59e2820808",
       "name": "contians value to lowercase1"
@@ -1287,7 +1262,7 @@
         "url": "https://api.crm.founderstack.cloud/api/people",
         "sendQuery": true,
         "specifyQuery": "json",
-        "jsonQuery": "{\n  \"name__icontains\": \"ahmed\"\n}",
+        "jsonQuery": "={{JSON.stringify($json.query_payload)}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1320,32 +1295,6 @@
       ],
       "id": "bcf88e50-5572-432e-8e8e-08baa3bcf6bc",
       "name": "clean4"
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "https://api.crm.founderstack.cloud/api/people/{{person_id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Api-Key  xzwG55JDaJEScSK28tGE1f-O3FxKcJwEhLEaocXP7Ao"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "options": {}
-      },
-      "id": "dfc30dc9-05bc-4d13-b173-fcaa0e30986b",
-      "name": "update person1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [
-        3664,
-        1312
-      ]
     },
     {
       "parameters": {
@@ -1459,8 +1408,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5312,
-        -1104
+        7920,
+        -1088
       ],
       "id": "86dc2c0c-d211-4180-be6f-176aca04b197",
       "name": "clean"
@@ -1991,11 +1940,385 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1904,
-        -1056
+        -368,
+        -576
       ],
       "id": "555b7dfd-cf9d-41bb-b345-6a08a31a6826",
       "name": "get_text_only"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message text while maintaining the same structure\nconst items = $input.all();\n\n// Process each item in the input\nconst result = items.map(item => {\n  // Check if the item has a message with text\n  if (item.json.message && item.json.message.text) {\n    // Create a new item with the same structure but only text in message\n    return {\n      json: {\n        // update_id: item.json.update_id,\n        usr_message: {\n          // message_id: item.json.message.message_id,\n          text: item.json.message.text\n        }\n      }\n    };\n  }\n  return item; // Return original item if no text found\n});\n\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        256
+      ],
+      "id": "cf10f9bc-05b1-4b76-85dc-911a8d93831d",
+      "name": "get text only"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "34bfaca2-6de5-4c04-9586-4150d9d8dbc7",
+              "leftValue": "={{ $json.actions[1].tool_name }}",
+              "rightValue": "add_tasks_or_notes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4160,
+        1648
+      ],
+      "id": "87f17296-401b-48c6-af3c-bd02275b0a43",
+      "name": "If7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "34bfaca2-6de5-4c04-9586-4150d9d8dbc7",
+              "leftValue": "={{ $json.actions[0].tool_name }}",
+              "rightValue": "update_person",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4848,
+        880
+      ],
+      "id": "9699dc91-81e8-4f65-b866-40c6d74fe4b4",
+      "name": "If8"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output_update_tool: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5536,
+        864
+      ],
+      "id": "2139d622-5239-42fa-b9e6-7fe933e940e1",
+      "name": "to TOON3"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.crm.founderstack.cloud/api/people/{{ $json.person_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Api-Key  xzwG55JDaJEScSK28tGE1f-O3FxKcJwEhLEaocXP7Ao"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.actions[0].payload.fields.core }}",
+        "options": {}
+      },
+      "id": "0830db05-debd-486d-abfe-420271931cfc",
+      "name": "update person2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        5184,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.crm.founderstack.cloud/api/tasks/import/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Api-Key xzwG55JDaJEScSK28tGE1f-O3FxKcJwEhLEaocXP7Ao"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.tasks }}",
+        "options": {}
+      },
+      "id": "cb2f24bc-edc5-4782-bce0-2f51efe5dcce",
+      "name": "add tasks2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        5328,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.crm.founderstack.cloud/api/notes/import/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Api-Key xzwG55JDaJEScSK28tGE1f-O3FxKcJwEhLEaocXP7Ao"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.notes }}",
+        "options": {}
+      },
+      "id": "2bdd751f-ce4a-4726-bd82-375a9f30146e",
+      "name": "add notes2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        5328,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9ac1aeed-e20d-480f-b489-712ea5a641cb",
+              "leftValue": "={{ $json.actions[1].payload.tasks }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4816,
+        1552
+      ],
+      "id": "67d9cdfd-e82b-4db3-bd11-90eb58097010",
+      "name": "If9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = items[0].json.actions[1].payload.tasks;\nconst personId = items[0].json.person_id;\n\nconst updatedTasks = tasks.map(task => {\n  return {\n    ...task,\n    related_person: personId\n  };\n});\n\n// Return as single item with tasks array\nreturn [{\n  json: {\n    tasks: updatedTasks\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5056,
+        1536
+      ],
+      "id": "08ae196e-7edc-422a-b74e-8d47ae904e07",
+      "name": "map tasks2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const notes = items[0].json.actions[1].payload.notes;\nconst personId = items[0].json.person_id;\n\nconst updatedNotes = notes.map(note => {\n  return {\n    ...note,\n    related_person: personId\n  };\n});\n\n// Return as single item with notes array\nreturn [{\n  json: {\n    notes: updatedNotes\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5056,
+        1792
+      ],
+      "id": "9b0113fe-3367-4c33-93a3-a372eb516171",
+      "name": "map notes2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9ac1aeed-e20d-480f-b489-712ea5a641cb",
+              "leftValue": "={{ $json.actions[1].payload.notes }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4832,
+        1808
+      ],
+      "id": "6d1db7df-221f-4982-af8d-8e107f3418b0",
+      "name": "If10"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        6016,
+        1664
+      ],
+      "id": "b737e8dd-f19b-4995-9f01-3f17050c23b6",
+      "name": "Merge9"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output_add_tasks_notes_tool: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6304,
+        1664
+      ],
+      "id": "1d05cf62-cf14-4686-9a61-6f5ed7d14125",
+      "name": "toon conv4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean and transform task data from input\nconst items = $input.all();\nconst result = [];\nconst transformedTasks = [];\n\nfor (const item of items) {\n  // The item itself is the task object\n  const task = item.json;\n  \n  // Transform the task data\n  const transformedTask = {\n    id: task.id || '',\n    created_at: task.created_at || '',\n    updated_at: task.updated_at || '',\n    title: task.title || '',\n    description: task.description || '',\n    status: task.status || '',\n    due_date: task.due_date || ''\n  };\n  \n  transformedTasks.push(transformedTask);\n}\n\n// Add all transformed tasks to a single result object\nif (transformedTasks.length > 0) {\n  result.push({ tasks: transformedTasks });\n} else {\n  result.push({ tasks: [] });\n}\n\n// Return the transformed data\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5584,
+        1536
+      ],
+      "id": "6f8c447e-e6e2-43f5-a222-8fa99c3d4094",
+      "name": "get impo values3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean and transform note data from input\nconst items = $input.all();\n\n// Transform all notes into the desired format\nconst notes = items.map(item => {\n  const note = item.json;\n  return {\n    id: note.id || '',\n    created_at: note.created_at || '',\n    updated_at: note.updated_at || '',\n    title: note.title || '',\n    content: note.content || ''\n  };\n});\n\n// Return a single object with all notes in one array\nreturn [{ notes: notes }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5584,
+        1792
+      ],
+      "id": "1bfccd8f-3430-4966-900b-0e7ef5f424a5",
+      "name": "get impo values4"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        6496,
+        1216
+      ],
+      "id": "2fde16a0-d4a4-4c75-a2f6-a434ac5ec3ef",
+      "name": "Merge10"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        6672,
+        944
+      ],
+      "id": "22c0a7c6-e8c3-40cd-9146-04d8a54c3f42",
+      "name": "Merge11"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "718f9fc3-179a-4c04-91e5-aebebbbc4b9d",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4528,
+        1104
+      ],
+      "id": "9de90d17-37f7-4ad0-b2f3-23997e8d4f6a",
+      "name": "need reason only"
     }
   ],
   "pinData": {},
@@ -2240,17 +2563,6 @@
         ]
       ]
     },
-    "to TOON2": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Merge1": {
       "main": [
         [
@@ -2277,7 +2589,17 @@
       "main": [
         [
           {
-            "node": "update person1",
+            "node": "If7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If8",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "need reason only",
             "type": "main",
             "index": 0
           }
@@ -2347,12 +2669,12 @@
             "index": 0
           },
           {
-            "node": "Merge",
+            "node": "get_text_only",
             "type": "main",
             "index": 0
           },
           {
-            "node": "get_text_only",
+            "node": "get text only",
             "type": "main",
             "index": 0
           }
@@ -2452,17 +2774,6 @@
         ]
       ]
     },
-    "get impor valiues": {
-      "main": [
-        [
-          {
-            "node": "to TOON2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Code in JavaScript3": {
       "main": [
         [
@@ -2492,6 +2803,11 @@
             "node": "query people2",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
           }
         ]
       ]
@@ -2616,17 +2932,6 @@
         [
           {
             "node": "Switch",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "update person1": {
-      "main": [
-        [
-          {
-            "node": "get impor valiues",
             "type": "main",
             "index": 0
           }
@@ -3052,6 +3357,209 @@
           }
         ]
       ]
+    },
+    "get text only": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "to TOON3": {
+      "main": [
+        [
+          {
+            "node": "Merge10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update person2": {
+      "main": [
+        [
+          {
+            "node": "to TOON3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If8": {
+      "main": [
+        [
+          {
+            "node": "update person2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add tasks2": {
+      "main": [
+        [
+          {
+            "node": "get impo values3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add notes2": {
+      "main": [
+        [
+          {
+            "node": "get impo values4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If9": {
+      "main": [
+        [
+          {
+            "node": "map tasks2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "map tasks2": {
+      "main": [
+        [
+          {
+            "node": "add tasks2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "map notes2": {
+      "main": [
+        [
+          {
+            "node": "add notes2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If10": {
+      "main": [
+        [
+          {
+            "node": "map notes2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge9": {
+      "main": [
+        [
+          {
+            "node": "toon conv4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impo values3": {
+      "main": [
+        [
+          {
+            "node": "Merge9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impo values4": {
+      "main": [
+        [
+          {
+            "node": "Merge9",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "If7": {
+      "main": [
+        [
+          {
+            "node": "If9",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge10": {
+      "main": [
+        [
+          {
+            "node": "Merge11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toon conv4": {
+      "main": [
+        [
+          {
+            "node": "Merge10",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge11": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "need reason only": {
+      "main": [
+        [
+          {
+            "node": "Merge11",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -3062,7 +3570,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": "YgQMQ2K8IXbIqztxtd-Mr"
   },
-  "versionId": "7d014da2-fd66-4b34-8d2e-552fd9517177",
+  "versionId": "b0c86862-37ed-42bd-be1f-3c39a8e69f54",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "65d1a339b442578b9f48438a32f521de239e91fb025b2f8c26e5d9e359ded7b8"
@@ -3070,16 +3578,16 @@
   "id": "t2etZt4J6Vm2uElZ",
   "tags": [
     {
-      "updatedAt": "2026-01-21T11:31:34.385Z",
-      "createdAt": "2026-01-21T11:31:34.385Z",
-      "id": "e4ix3M1lJMuhr7l6",
-      "name": "dev"
-    },
-    {
       "updatedAt": "2026-02-02T14:19:10.343Z",
       "createdAt": "2026-02-02T14:19:10.343Z",
       "id": "PtInofDqy6UoRVMg",
       "name": "voice"
+    },
+    {
+      "updatedAt": "2026-01-21T11:31:34.385Z",
+      "createdAt": "2026-01-21T11:31:34.385Z",
+      "id": "e4ix3M1lJMuhr7l6",
+      "name": "dev"
     }
   ]
 }

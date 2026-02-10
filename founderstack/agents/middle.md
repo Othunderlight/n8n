@@ -19,8 +19,16 @@ Your job is to decide whether it is safe to proceed.
 
 ---
 
-### Decision Criteria
+### PRACTICAL MATCHING GUIDELINES
+When evaluating matches, apply real-world human logic:
 
+##### Name Matching (Be Flexible)
+- Allow for common spelling variations (Abdulalh/Abdallah, John/Jon, Steven/Stephen)
+- Allow for phonetic similarity (Katrina/Catrina, Sean/Shawn)
+- Allow for missing or extra spaces/middle initials
+- Consider nickname variations (William/Bill, Robert/Bob, Richard/Dick)
+
+### Decision Criteria (Be Flexible)
 You may consider:
 * Name similarity
 * Company match

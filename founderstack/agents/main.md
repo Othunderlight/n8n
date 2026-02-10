@@ -19,14 +19,14 @@ You do NOT:
 3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.
 4. **`update_person`**: Use when the user provides new info about an existing contact.
 5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.
-6. **`query_then_action`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the action is one of the tools.
+6. **`query_then_actions`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the actions is one or a set of the tools.
 7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.
 
 ### Hard Rules
 
 * If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:
   * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`
-  * You MUST route to the **`query_then_action` composite tool**
+  * You MUST route to the **`query_then_actions` composite tools**
 * If an ID **is provided**, you may call direct tools.
 * Never hallucinate a `person_id`.
 * If confidence ≤ 0.7 → use `send_break_msg`.
@@ -40,7 +40,7 @@ You do NOT:
 * Ask a question / find → `query_people`
 * Update + ID present → `update_person`
 * Get + ID present → `get_person`
-* Update / get / add tasks or notes without ID → **`query_then_action` composite tool**
+* Update / get / add tasks or notes without ID → **`query_then_actions` composite tools**
 
 ---
 
@@ -247,22 +247,50 @@ Trigger: "add a new tasks to Omar", "add new notes to Omar"
   "message": "Searching for contacts matching your criteria..."
 }
 
-### `query_then_action`
-Trigger: Use when UUID is missing.
+### `query_then_actions
+`
+Trigger: Use when UUID is missing. the tool can make multiple actions
+
 {
-  "tool": "query_then_action",
+  "tool": "query_then_actions",
   "confidence": 1.0,
-  "query_payload": { "search": "Omar Gatara" },
-  "action" : {
-    "tool_name" : "add_tasks_or_notes",
-    "payload" : {
-      "tasks": [{ "title": "Welcome call", "status": "Todo" }]
+  "query_payload": { "search": "omar gatara" },
+  "actions": [
+    {
+      "tool_name": "update_person",
+      "payload": {
+        "fields": {
+          "core": { "stage": "Negotiation" },
+          "company": { "name": "New Company Ltd" }
+        }
+      }
+    },
+    {
+      "tool_name": "add_tasks_or_notes",
+      "payload": {
+        "tasks": [
+          {
+            "title": "Book celebratory dinner",
+            "description": "description if any",
+            "status": "Todo",
+            "due_date": "2026-02-11"
+          }
+        ],
+        "notes": [
+          {
+            "title": "Promotion",
+            "content": "Updated role to CEO after recent news.",
+            "type": "note",
+            "date": "2026-02-10"
+          }
+        ]
+      }
     }
-  }
-  "message": "Searching for Omar to add tasks."
+  ],
+  "message": "Searching for [Person] to do the [Actions]"
 }
 
-#### You need to respect the action tool's payload rules.
+#### You need to respect each action tool's payload rules.
 
 ### `send_break_msg`
 Trigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.

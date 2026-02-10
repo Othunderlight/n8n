@@ -197,7 +197,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2192,
+        2304,
         624
       ],
       "id": "074ac0d2-d650-446f-b886-3f1402c8460e",
@@ -305,7 +305,7 @@
         "promptType": "define",
         "text": "={{ $json.message?.text || $json.segments?.[0]?.text || $json.content?.parts[0]?.text }}",
         "options": {
-          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the perople, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.\n6. **`query_then_actions`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the actions is one or a set of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_actions` composite tools**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_actions` composite tools**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_actions\n`\nTrigger: Use when UUID is missing. the tool can make multiple actions\n\n{\n  \"tool\": \"query_then_actions\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"omar gatara\" },\n  \"actions\": [\n    {\n      \"tool_name\": \"update_person\",\n      \"payload\": {\n        \"fields\": {\n          \"core\": { \"stage\": \"Negotiation\" },\n          \"company\": { \"name\": \"New Company Ltd\" }\n        }\n      }\n    },\n    {\n      \"tool_name\": \"add_tasks_or_notes\",\n      \"payload\": {\n        \"tasks\": [\n          {\n            \"title\": \"Book celebratory dinner\",\n            \"description\": \"description if any\",\n            \"status\": \"Todo\",\n            \"due_date\": \"2026-02-11\"\n          }\n        ],\n        \"notes\": [\n          {\n            \"title\": \"Promotion\",\n            \"content\": \"Updated role to CEO after recent news.\",\n            \"type\": \"note\",\n            \"date\": \"2026-02-10\"\n          }\n        ]\n      }\n    }\n  ],\n  \"message\": \"Searching for [Person] to do the [Actions]\"\n}\n\n#### You need to respect each action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
+          "systemMessage": "=You are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload with all relevant entities (Person, Company, Tasks, Notes)\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`get_person`**: Use when a specific ID is provided to fetch a full profile including notes and tasks.\n2. **`create_person`**: Use when the user introduces someone new.\n3. **`query_people`**: Use when the user asks a question about existing contacts, the tool will return the core info about the people and thier related companies, without the realted notes and tasks.\n4. **`update_person`**: Use when the user provides new info about an existing contact.\n5. **`add_tasks_or_notes`**: Use when the user wanna add a new tasks or notes to an existing person and the user provided the person id.\n6. **`query_then_actions`**: Use when you need to get the ID to update or retrieve a specific person or related fields. the actions is one or a set of the tools.\n7. **`send_break_msg`**: Use when you wanna break and not call any tool to send the user a msg, because you're not confident enough.\n\n### Hard Rules\n\n* If the user wants to **update or retrieve or add a new realted field (like tasks or notes) to existing person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person` or `add_tasks_or_notes`\n  * You MUST route to the **`query_then_actions` composite tools**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `person_id`.\n* If confidence ≤ 0.7 → use `send_break_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get / add tasks or notes without ID → **`query_then_actions` composite tools**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Fields)\n\n### Core (Person)\n* **name: (Required)** The full name of the person.\n* **email**: Professional or personal email address.\n* **phone**: Contact phone number.\n* **job_title**: Their current role.\n* **city**: Current city or region.\n* **linkedin**: URL to their LinkedIn profile.\n* **conversion_rate**: Numerical value (0-100) representing probability.\n* **stage**: Current stage in the pipeline (e.g. Lead, Qualified).\n* **lead_type**: Type of lead (e.g. Prospect, Client).\n* **lead_source**: Whether the lead is Inbound or Outbound.\n* **last_action**: Description of the last action taken.\n* **recommended_action**: Suggested next action.\n* **created_by**: User who created this person record.\n\n### Company\n* **name: (Required for new companies)** Company name.\n* **domain**: e.g., \"google.com\".\n* **employees**: Number of employees (string).\n* **location**: Office location.\n* **linkedin**: Company LinkedIn URL.\n* **arr**: Annual Recurring Revenue (e.g., \"$1M\").\n* **icp**: Boolean (Ideal Customer Profile match).\n\n### Tasks\n* **title: (Required)** Task title.\n* **description**: Detailed description.\n* **status**: Options: \"Todo\", \"In Progress\", \"Done\".\n* **due_date**: ISO 8601 (YYYY-MM-DD).\n\n### Notes / Activities\n* **title**: Brief summary of the note or activity.\n* **content**: Full text/body.\n* **type**: Activity type (note, email, call, meeting, linkedin_msg, whatsapp_msg).\n* **date**: ISO 8601 (YYYY-MM-DD).\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n{\n  \"tool\": \"get_person\",\n  \"person_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile for [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry.\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Jane Doe\",\n      \"email\": \"jane@example.com\",\n      \"stage\": \"Qualified\"\n    },\n    \"company\": {\n      \"name\": \"Acme Corp\",\n      \"domain\": \"acme.com\"\n    },\n    \"notes\": [\n      { \"title\": \"Initial Meet\", \"content\": \"Met at conference.\", \"type\": \"note\" }\n    ],\n    \"tasks\": [\n      { \"title\": \"Follow up\", \"status\": \"Todo\", \"due_date\": \"2026-02-10\" }\n    ]\n  },\n  \"message\": \"Payload prepared for Jane Doe and associated entities.\"\n}\n\n#### Master Payload (Create)\n{\n  \"fields\": {\n    \"core\": {\n      \"name\": \"Ahmed Ali\",\n        \"email\": \"ahmed@example.com\",\n        \"phone\": \"09877666\",\n        \"job_title\": \"founder\",\n        \"city\": null,\n        \"linkedin\": \"https://liknkeidn.cpm\",\n        \"conversion_rate\": 80,\n        \"stage\": \"Qualified\",\n        \"lead_type\": \"Prospect\",\n        \"lead_source\": \"Outbound\",\n        \"last_action\": \"this is alst caticon\",\n        \"recommended_action\": null\n    },\n    \"company\": {\n      \"name\": \"Velocity Tech\",\n      \"domain\": \"velocity.tech\",\n      \"employees\": \"50-200\",\n      \"location\": \"Austin, TX\",\n      \"icp\": true\n    },\n    \"notes\": [\n      {\n        \"title\": \"Networking Event\",\n        \"content\": \"Met at Tech Mixer; discussed AI integration.\",\n        \"type\": \"note\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Send Welcome Email\",\n        \"status\": \"Todo\",\n        \"due_date\": \"2026-02-04\"\n      }\n    ]\n  }\n}\n\n### `query_people`\nTrigger: \"Find Omar in Dubai\" or \"Who are my warm leads?\"\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filters\": {\n    \"search\": \"omar\",\n    \"city__icontains\": \"dubai\",\n    \"lead_type__icontains\": \"warm lead\"\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n#### Master Payload Docs\nUse the `search` parameter to perform a \"fuzzy\" match across multiple fields (Name, Email, Job Title, etc.).\nYou can filter by specific fields using suffixes:\n- Partial Match (`__icontains`)\n`name__icontains=adm`\n*Matches: \"Admin\", \"Ahmad\", \"Roadman\"*\n\n- Numeric/Date Filters\n*   `__gt`: Greater than\n*   `__lt`: Less than\n*   `__gte`: Greater than or equal\n*   `__lte`: Less than or equal\n\n\n### `update_person`\nTrigger: \"Update Omar's company or update omar stage\"\n{\n  \"tool\": \"update_person\",\n  \"person_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"fields\": {\n    \"core\": { \"stage\": \"Negotiation\" },\n    \"company\": { \"name\": \"New Company Ltd\" }\n  },\n  \"message\": \"Updating Omar [Fields]\"\n}\n\n#### Master Payload (Update)\n{\n  \"fields\": {\n    \"core\": {\n      \"job_title\": \"CEO\",\n      \"conversion_rate\": 95\n    },\n    \"company\": {\n      \"arr\": \"$2M\",\n      \"icp\": true\n    }\n  }\n}\n\n### `add_tasks_or_notes`\nTrigger: \"add a new tasks to Omar\", \"add new notes to Omar\"\n{\n  \"tool\": \"add_tasks_or_notes\",\n  \"confidence\": 1.0,\n  \"fields\": {\n    \"notes\": [\n      {\n        \"title\": \"Promotion\",\n        \"content\": \"Updated role to CEO after recent news.\",\n        \"type\": \"update\"\n      }\n    ],\n    \"tasks\": [\n      {\n        \"title\": \"Book celebratory dinner\",\n        \"due_date\": \"2026-02-15\",\n        \"status\": \"Todo\"\n      }\n    ]\n  },\n  \"message\": \"Searching for contacts matching your criteria...\"\n}\n\n### `query_then_actions\n`\nTrigger: Use when UUID is missing. the tool can make multiple actions\n\n{\n  \"tool\": \"query_then_actions\",\n  \"confidence\": 1.0,\n  \"query_payload\": { \"search\": \"omar gatara\" },\n  \"actions\": [\n    {\n      \"tool_name\": \"update_person\",\n      \"payload\": {\n        \"fields\": {\n          \"core\": { \"stage\": \"Negotiation\" },\n          \"company\": { \"name\": \"New Company Ltd\" }\n        }\n      }\n    },\n    {\n      \"tool_name\": \"add_tasks_or_notes\",\n      \"payload\": {\n        \"tasks\": [\n          {\n            \"title\": \"Book celebratory dinner\",\n            \"description\": \"description if any\",\n            \"status\": \"Todo\",\n            \"due_date\": \"2026-02-11\"\n          }\n        ],\n        \"notes\": [\n          {\n            \"title\": \"Promotion\",\n            \"content\": \"Updated role to CEO after recent news.\",\n            \"type\": \"note\",\n            \"date\": \"2026-02-10\"\n          }\n        ]\n      }\n    }\n  ],\n  \"message\": \"Searching for [Person] to do the [Actions]\"\n}\n\n#### You need to respect each action tool's payload rules.\n\n### `send_break_msg`\nTrigger: when you dont wnana call any tool because lack of confidence or unclear request from the user.\n{\n  \"tool\": \"send_break_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ message ro feedback for the user about his msg\",\n  \"reason\": \"the reason\"\n}\n\n---\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD).\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -2019,7 +2019,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        4848,
+        4560,
         880
       ],
       "id": "9699dc91-81e8-4f65-b866-40c6d74fe4b4",
@@ -2032,8 +2032,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5536,
-        864
+        5744,
+        608
       ],
       "id": "2139d622-5239-42fa-b9e6-7fe933e940e1",
       "name": "to TOON3"
@@ -2061,8 +2061,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        5184,
-        864
+        5392,
+        608
       ]
     },
     {
@@ -2319,6 +2319,74 @@
       ],
       "id": "9de90d17-37f7-4ad0-b2f3-23997e8d4f6a",
       "name": "need reason only"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1e9639a1-f680-4cae-af69-7b0fa572e264",
+              "leftValue": "={{ $json.actions[0].payload.fields.core }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4992,
+        624
+      ],
+      "id": "d145d2fe-7c26-4c95-affb-d0f9a08ca98b",
+      "name": "If11"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1e9639a1-f680-4cae-af69-7b0fa572e264",
+              "leftValue": "={{ $json.actions[0].payload.fields.company }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4992,
+        864
+      ],
+      "id": "3e0aeb00-b3f8-4c23-9b84-74e69e4e2b88",
+      "name": "If12"
     }
   ],
   "pinData": {},
@@ -3395,7 +3463,12 @@
       "main": [
         [
           {
-            "node": "update person2",
+            "node": "If11",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If12",
             "type": "main",
             "index": 0
           }
@@ -3560,6 +3633,17 @@
           }
         ]
       ]
+    },
+    "If11": {
+      "main": [
+        [
+          {
+            "node": "update person2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -3570,7 +3654,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": "YgQMQ2K8IXbIqztxtd-Mr"
   },
-  "versionId": "b0c86862-37ed-42bd-be1f-3c39a8e69f54",
+  "versionId": "efa2cc7a-06ae-462a-a183-c5d8dbb060ea",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "65d1a339b442578b9f48438a32f521de239e91fb025b2f8c26e5d9e359ded7b8"

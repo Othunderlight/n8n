@@ -1,0 +1,2178 @@
+{
+  "name": "notion-actions-firas",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "get",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.page_id }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        -448
+      ],
+      "id": "0d656f83-9d99-4cdd-a3ef-857173afa696",
+      "name": "Get person by id",
+      "credentials": {
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to format dates to \"MMM DD, YYYY\" (e.g., Dec 31, 2025)\nconst formatDate = (dateInput) => {\n  // Handle if dateInput is an object { start: \"...\" } or a string\n  const dateString = (dateInput && typeof dateInput === 'object') ? dateInput.start : dateInput;\n  if (!dateString) return \"N/A\";\n  \n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\nreturn items.map(item => {\n  const p = item.json;\n\n  // 1. Define the fields we care about\n  const cleanData = {\n    id: p.id,\n    name: p.name,\n    url: p.url, // Notion URL included as requested\n    industry: p.property_industry || \"N/A\",\n    email: p.property_email || \"N/A\",\n    linkedin_url: p.property_linked_in_url || \"N/A\",\n    phone: p.property_phone || \"N/A\",\n    notes: p.property_notes || \"N/A\",\n    tags: Array.isArray(p.property_tags) ? p.property_tags.join(\", \") : \"N/A\",\n    status: p.property_status || \"N/A\",\n    last_contact_date: formatDate(p.property_last_contact_date),\n    context: p.property_context || \"N/A\",\n    job_title: p.property_job_title || \"N/A\",\n    follow_up_reminder: formatDate(p.property_follow_up_reminder),\n    enriched: p.property_enriched ?? false,\n    company: p.property_company || \"N/A\",\n    location: p.property_location || \"N/A\"\n  };\n\n  // 2. Convert the clean object into TOON format string\n  const toonString = Object.entries(cleanData)\n    .map(([key, value]) => `${key}: ${value}`)\n    .join('\\n');\n\n  // 3. Return ONLY the toon output\n  return {\n    json: {\n      toon_output: toonString\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -448
+      ],
+      "id": "ce51d6e8-12a0-43e4-8bd3-e5b8381deed5",
+      "name": "toon conv1"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {{ JSON.stringify($json.properties) }}\n}",
+        "options": {}
+      },
+      "id": "c40ce778-b627-48cb-88df-fba78b9d4262",
+      "name": "Update Notion Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1072,
+        16
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YInJN8tF12gDf6HM",
+          "name": "Header Auth account"
+        },
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8ae72478-6af2-4a7e-8af7-2360e79dfd10",
+                    "leftValue": "={{ JSON.parse($json.output).tool }}",
+                    "rightValue": "get_person",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ JSON.parse($json.output).tool }}",
+                    "rightValue": "create_person",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "1f3fa645-9524-48e1-81d9-886ddbdbb2cf"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b502b9a3-1e86-4e4b-989b-71712fd1c743",
+                    "leftValue": "={{ JSON.parse($json.output).tool }}",
+                    "rightValue": "update_person",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "943aad49-3e7a-451c-a72c-8ec44c02d8fb",
+                    "leftValue": "={{ JSON.parse($json.output).tool }}",
+                    "rightValue": "query_people",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b59a668f-3b79-4625-a67a-987a969b77ca",
+                    "leftValue": "={{ JSON.parse($json.output).tool }}",
+                    "rightValue": "query_then_update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        -64
+      ],
+      "id": "380aa3d4-a08f-4a40-83c4-9cd10b6d309e",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/f2fbf211b5fe49e8b5cc6cf68138f96b/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.filter_object }}",
+        "options": {}
+      },
+      "id": "bcc8caf1-0918-4b19-a33e-6b238c956aeb",
+      "name": "Query Notion Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1072,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YInJN8tF12gDf6HM",
+          "name": "Header Auth account"
+        },
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to format dates to \"MMM DD, YYYY\" (e.g., Dec 31, 2025)\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// Process the incoming items\nlet allResults = [];\n\nfor (const item of items) {\n  const results = item.json.results || [];\n  \n  // 1. Filter out items in trash\n  // 2. Map to the clean structure\n  const filteredAndFormatted = results\n    .filter(page => page.in_trash === false)\n    .map(page => {\n      const props = page.properties;\n\n      return {\n        json: {\n          // Root level fields\n          id: page.id,\n          url: page.url, // <--- Added the Notion URL here\n          created_time: formatDate(page.created_time),\n          last_edited_time: formatDate(page.last_edited_time),\n\n          // Properties\n          industry: props.Industry?.select?.name || null,\n          email: props.Email?.email || null,\n          linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n          phone: props.Phone?.phone_number || null,\n          \n          // Rich Text (joined into strings)\n          notes: props.Notes?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          tags: props.Tags?.multi_select.map(s => s.name).join(\", \") || \"\",\n          \n          status: props.Status?.status?.name || null,\n          last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n          context: props.Context?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          job_title: props[\"Job Title\"]?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n          enriched: props.Enriched?.checkbox || false,\n          company: props.Company?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          location: props.Location?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          name: props.Name?.title.map(t => t.plain_text).join(\"\") || \"\"\n        }\n      };\n    });\n\n  allResults.push(...filteredAndFormatted);\n}\n\nreturn allResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        240
+      ],
+      "id": "783001bf-4ab1-4c22-a8ee-eb494d819bad",
+      "name": "get important values",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items passed to the node\nconst allItems = items;\n\n// This will store each formatted record string\nlet combinedToon = [];\n\nallItems.forEach((item, index) => {\n  const obj = item.json;\n  let recordLines = [];\n  \n  // Start the record with the number (e.g., 1:)\n  recordLines.push(`${index + 1}:`);\n\n  for (const [key, value] of Object.entries(obj)) {\n    // Handling empty or null values gracefully\n    const displayValue = (value === null || value === \"\" || value === undefined) ? \"N/A\" : value;\n    \n    // Indent the keys for better readability under the record number\n    recordLines.push(`  ${key}: ${displayValue}`);\n  }\n  \n  // Join the lines for this specific record and add it to our array\n  combinedToon.push(recordLines.join('\\n'));\n});\n\n// Return a SINGLE item containing all records joined by double newlines\nreturn [\n  {\n    json: {\n      toon_output: combinedToon.join('\\n\\n')\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        240
+      ],
+      "id": "d1186695-b29c-4f95-95d8-15e164530f12",
+      "name": "toon conv"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -208
+      ],
+      "id": "b77cd663-5422-4605-941b-6fd23805f8c3",
+      "name": "to TOON"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        16
+      ],
+      "id": "cfb7e301-9226-4230-9066-7314453b4ae5",
+      "name": "to TOON1"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003131045565",
+        "text": "={{ $json.formattedMessage }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        1696
+      ],
+      "id": "d4be1701-9151-44ba-8f2d-5311bb223ccc",
+      "name": "Send a text message",
+      "webhookId": "8a7d3f5d-388b-4545-b13a-6fa5838c8814",
+      "credentials": {
+        "telegramApi": {
+          "id": "sqhg2tmUTZEjGSGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  try {\n    const data = item.json.body;\n    const props = data.properties || {};\n    \n    // 1. Start header with Status and Confidence\n    let headerLines = [\n      `Status: ${data.status || 'Unknown'}`,\n      `Confidence: ${(data.confidence * 100).toFixed(0)}%`\n    ];\n\n    // 2. Scan properties ONLY for URLs to put in the quote\n    for (const [key, value] of Object.entries(props)) {\n      if (typeof value === 'string' && value.startsWith('http')) {\n        // Clean up key names (e.g., \"Notion_URL\" becomes \"Notion URL\")\n        const cleanKey = key.replace(/_/g, ' ');\n        headerLines.push(`${cleanKey}: <a href=\"${value}\">View</a>`);\n      }\n    }\n\n    // 3. Handle Failure Reason (Italics)\n    let reasonSection = \"\";\n    if (data.reason && data.reason.trim() !== \"\") {\n      reasonSection = `\\n\\n<i>${data.reason}</i>`;\n    }\n\n    // 4. Combine into final Telegram format\n    const finalMessage = `<blockquote>${headerLines.join('\\n')}</blockquote>\n\n${data.message || ''}${reasonSection}`;\n\n    item.json.formattedMessage = finalMessage;\n\n  } catch (e) {\n    item.json.formattedMessage = `Error formatting message: ${e.message}`;\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        1696
+      ],
+      "id": "d223c7a0-b99c-416a-bf6e-bd16183dee17",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9668c89e-aa2e-4812-abac-b18cf847ca8c",
+              "leftValue": "={{ $json.body.tool }}",
+              "rightValue": "send_final_msg",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        1696
+      ],
+      "id": "48084dce-1717-491c-bba8-c67f97491145",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message?.text || $json.segments?.[0]?.text || $json.content?.parts[0]?.text }}",
+        "options": {
+          "systemMessage": "=# 🧠 PROMPT 1 — PRIMARY AGENT (Planner / Router)\n\nYou are the **Primary CRM Planner**.\n\nYour job is to:\n1. Understand the user’s intent\n2. Decide which tool should be used\n3. Prepare the initial payload\n\nYou do NOT:\n* Guess IDs\n* Claim success\n* Resolve ambiguous records\n* Talk directly to the user\n\n---\n\n### Your Tools\n1. **`create_person`**: Use when the user introduces someone new.\n2. **`query_people`**: Use when the user asks a question about existing contacts or \"finds\" someone.\n3. **`update_person`**: Use when the user provides new info about an existing contact.\n4. **`get_person`**: Use when a specific ID is provided to fetch a full profile.\n5. **`query_then_update`**: Use when you need to get the ID to update or retrieve a specifc person.\n\n\n### Hard Rules\n\n* If the user wants to **update or retrieve a person** and **no ID is provided**:\n  * You MUST NOT call `update_person` or `get_person`\n  * You MUST route to the **`query_then_update` composite tool**\n* If an ID **is provided**, you may call direct tools.\n* Never hallucinate a `page_id`.\n* If confidence ≤ 0.7 → use `send_final_msg`.\n* `query_people` & `create_person` tools does NOT need an ID to run\n\n---\n\n### Tool Routing Logic\n\n* New person → `create_person`\n* Ask a question / find → `query_people`\n* Update + ID present → `update_person`\n* Get + ID present → `get_person`\n* Update / get without ID → **`query_then_update` composite tool**\n\n---\n\n### Output Format\n\nReturn **raw JSON only**, matching one of the tools with the payload.\n\n\n---\n\n### TOOLS DOCS\n\n## Database Schema (Properties)\n\n* **Name: (Reuired)** The primary name of the individual.\n* **Company**\n* **Email**\n* **Phone**\n* **Job Title**\n* **Industry:** The professional sector they belong to.\n* **LinkedIn URL**\n* **Location:** City or region.\n* **Context:** Summary of who they are and the nature of the relationship.\n* **Notes:** Detailed interaction logs or important info information.\n* **Tags**\n* **Status: (Reuired)** Options (STRICT): \"To reach out\", \"In conversation\", \"Connected\", \"Not a fit\".\n* **Follow-up Reminder:** Date set for future outreach.\n* **Last Contact Date:** The last time interaction occurred.\n* **Enriched:** STRICT: \"true\" or \"false\" indicating if the profile data has been enhanced.\n\n---\n\n## Tool Definitions\n\n### `get_person`\nTrigger: Retrieve specific profile details via UUID.\n\n{\n  \"tool\": \"get_person\",\n  \"page_id\": \"UUID\",\n  \"confidence\": 1.0,\n  \"message\": \"Fetching profile ID [ID]\"\n}\n\n### `create_person`\nTrigger: New contact entry. \nRequired: Name, Status, Context. \nDefaults: Enriched: false, Last Contact Date: Today's date.\n\n{\n  \"tool\": \"create_person\",\n  \"confidence\": 0.98,\n  \"fields\": {\n    \"Name\": \"Name\",\n    \"Company\": \"Company Name\",\n    \"Status\": \"To reach out\",\n    \"Last Contact Date\": \"2026-01-31\",\n    \"rest_of_fields\": \"None\"\n  },\n  \"message\": \"Pyload prepared for [Name].\"\n}\n\n#### Master Payload\nThis is the final simplified object for your mapping logic to process:\n\n{\n  \"parent_id\": \"f2fbf211b5fe49e8b5cc6cf68138f96b\",\n  \"properties\": {\n    \"Name\": \"Sara Omar\",\n    \"Company\": \"Velocity Tech\",\n    \"Email\": \"sara@gmail.com\",\n    \"Status\": \"To reach out\",\n    \"Context\": \"Met at Tech Mixer; discussed AI integration.\",\n    \"Tags\": [\"Work\", \"AI\"],\n    \"Industry\": \"SaaS\",\n    \"Job Title\": \"Head of Product\",\n    \"Location\": \"Austin\",\n    \"Last Contact Date\": \"2026-01-31\",\n    \"Enriched\": false\n  }\n}\n\n### `query_people`\nTrigger: \"Who do I know in London?\" or \"Find the email for Name\"\nNote: Use `contains` for names and text to avoid fuzzy search issues.\n\n{\n  \"tool\": \"query_people\",\n  \"confidence\": 1.0,\n  \"filter_object\": {\n    \"filter\": {\n      \"and\": [\n        {\n          \"property\": \"Name\",\n          \"rich_text\": {\n            \"contains\": \"omar gatara\"\n          }\n        }\n      ]\n    }\n  },\n  \"message\": \"Searching for contacts in London...\"\n}\n\n#### Master Payload\n{\n  \"filter\": {\n    \"and\": [\n      {\n        \"property\": \"Name\",\n        \"rich_text\": {\n          \"contains\": \"omar gatara\"\n        }\n      },\n      {\n        \"property\": \"Company\",\n        \"rich_text\": {\n          \"contains\": \"founderstack\"\n        }\n      },\n      {\n        \"property\": \"Email\",\n        \"email\": {\n          \"equals\": \"omar@founderstack.cloud\"\n        }\n      },\n      {\n        \"property\": \"Enriched\",\n        \"checkbox\": {\n          \"equals\": true\n        }\n      },\n      {\n        \"property\": \"Industry\",\n        \"select\": {\n          \"equals\": \"ai\"\n        }\n      },\n      {\n        \"property\": \"Tags\",\n        \"multi_select\": {\n          \"contains\": \"Personal\"\n        }\n      },\n      {\n        \"property\": \"Status\",\n        \"status\": {\n          \"equals\": \"Connected\"\n        }\n      },\n      {\n        \"property\": \"Job Title\",\n        \"rich_text\": {\n          \"contains\": \"founder\"\n        }\n      },\n      {\n        \"property\": \"Last Contact Date\",\n        \"date\": {\n          \"equals\": \"2026-01-28\"\n        }\n      },\n      {\n        \"property\": \"Follow-up Reminder\",\n        \"date\": {\n          \"on_or_before\": \"2025-12-31\"\n        }\n      },\n      {\n        \"property\": \"LinkedIn URL\",\n        \"url\": {\n          \"contains\": \"linkedin.com\"\n        }\n      },\n      {\n        \"property\": \"Phone\",\n        \"phone_number\": {\n          \"equals\": \"+987573773733\"\n        }\n      },\n      {\n        \"property\": \"Location\",\n        \"rich_text\": {\n          \"equals\": \"syria\"\n        }\n      },\n      {\n        \"property\": \"Context\",\n        \"rich_text\": {\n          \"contains\": \"ai\"\n        }\n      },\n      {\n        \"property\": \"Notes\",\n        \"rich_text\": {\n          \"contains\": \"notes\"\n        }\n      }\n    ]\n  }\n}\n\noptions for date fields: equals, before, after, on_or_before, past_week, this_week\n\n### `update_person`\nTrigger: \"Update Omar's status to Connected\" or \"Omar moved to Berlin.\"\n\n{\n  \"tool\": \"update_person\",\n  \"page_id\": \"UUID_FROM_CONTEXT\",\n  \"confidence\": 0.9,\n  \"properties\": {\n    \"Location\": { \"rich_text\": [{ \"text\": { \"content\": \"Berlin\" } }] }\n  },\n  \"message\": \"Updating [Properity] for [Name]\"\n}\n\nWhen updating, Notion API requires you to provide the full property object structure (e.g., `title`, `rich_text`, `select`)...\n\n#### Master Payload\n{\n  \"properties\": {\n    \"Name\": {\n      \"title\": [{ \"text\": { \"content\": \"New Name Value\" } }]\n    },\n    \"Company\": {\n      \"rich_text\": [{ \"text\": { \"content\": \"New Company Name\" } }]\n    },\n    \"Email\": {\n      \"email\": \"new-email@example.com\"\n    },\n    \"Enriched\": {\n      \"checkbox\": true\n    },\n    \"Industry\": {\n      \"select\": { \"name\": \"SaaS\" }\n    },\n    \"Tags\": {\n      \"multi_select\": [\n        { \"name\": \"Work\" },\n        { \"name\": \"ai\" }\n      ]\n    },\n    \"Status\": {\n      \"status\": { \"name\": \"Connected\" }\n    },\n    \"Job Title\": {\n      \"rich_text\": [{ \"text\": { \"content\": \"Head of Engineering\" } }]\n    },\n    \"Last Contact Date\": {\n      \"date\": { \"start\": \"2026-01-31\" }\n    },\n    \"Follow-up Reminder\": {\n      \"date\": { \"start\": \"2026-02-04T03:00:00.000+03:00\" }\n    },\n    \"LinkedIn URL\": {\n      \"url\": \"https://linkedin.com/in/newprofile\"\n    },\n    \"Phone\": {\n      \"phone_number\": \"+1234567890\"\n    },\n    \"Location\": {\n      \"rich_text\": [{ \"text\": { \"content\": \"New York\" } }]\n    },\n    \"Context\": {\n      \"rich_text\": [{ \"text\": { \"content\": \"Updated context notes\" } }]\n    },\n    \"Notes\": {\n      \"rich_text\": [{ \"text\": { \"content\": \"Updated meeting notes\" } }]\n    }\n  }\n}\n\n### `query_then_update`\nTrigger: Use when the user wants to update or get a person but has only provided a name or partial info instead of a specific UUID\n\n{\n  \"tool\": \"query_then_update\",\n  \"confidence\": 1.0,\n  \"description\": \"Composite tool used to find a person by name or other attributes when a UUID is not provided, enabling a subsequent update or retrieval of their full profile.\",\n  \"query_payload\": {\n    \"filter\": {\n      \"and\": [\n        {\n          \"property\": \"Name\",\n          \"rich_text\": {\n            \"contains\": \"Name to find\"\n          }\n        }\n      ]\n    }\n  },\n  \"update_payload\": {\n    \"properties\": {\n      \"Status\": {\n        \"status\": {\n          \"name\": \"Connected\"\n        }\n      }\n    }\n  },\n  \"message\": \"Searching for [Name] to perform the requested update.\"\n}\n\nRespect the query_people, update_person tools's master payloads\n\n\n#### Final NOTES\n- For all Dates; STRICT: Use ISO 8601 (YYYY-MM-DD) for all property updates.\n- Today's Date is {{ $now.toFormat('yyyy-MM-dd') }}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1120,
+        -112
+      ],
+      "id": "214044e3-cf59-4d16-b517-29b113e814ed",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1072,
+        208
+      ],
+      "id": "cb8a4c54-47db-4522-b596-8097bc80fc24",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TppyipaFrqXqvcLE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        208
+      ],
+      "id": "5c25204d-1ece-4d0b-8aa4-02f461a86ba4",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "VqxrwHahgVrPESe1",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/f2fbf211b5fe49e8b5cc6cf68138f96b/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {{ JSON.stringify($json.query_payload.filter) }}\n}",
+        "options": {}
+      },
+      "id": "8b0d2e14-3cd8-4c35-b052-b35107597a89",
+      "name": "Query Notion Database1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1072,
+        576
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YInJN8tF12gDf6HM",
+          "name": "Header Auth account"
+        },
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to format dates to \"MMM DD, YYYY\" (e.g., Dec 31, 2025)\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// Process the incoming items\nlet allResults = [];\n\nfor (const item of items) {\n  const results = item.json.results || [];\n  \n  // 1. Filter out items in trash\n  // 2. Map to the clean structure\n  const filteredAndFormatted = results\n    .filter(page => page.in_trash === false)\n    .map(page => {\n      const props = page.properties;\n\n      return {\n        json: {\n          // Root level fields\n          id: page.id,\n          url: page.url, // <--- Added the Notion URL here\n          created_time: formatDate(page.created_time),\n          last_edited_time: formatDate(page.last_edited_time),\n\n          // Properties\n          industry: props.Industry?.select?.name || null,\n          email: props.Email?.email || null,\n          linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n          phone: props.Phone?.phone_number || null,\n          \n          // Rich Text (joined into strings)\n          notes: props.Notes?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          tags: props.Tags?.multi_select.map(s => s.name).join(\", \") || \"\",\n          \n          status: props.Status?.status?.name || null,\n          last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n          context: props.Context?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          job_title: props[\"Job Title\"]?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n          enriched: props.Enriched?.checkbox || false,\n          company: props.Company?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          location: props.Location?.rich_text.map(t => t.plain_text).join(\" \") || \"\",\n          name: props.Name?.title.map(t => t.plain_text).join(\"\") || \"\"\n        }\n      };\n    });\n\n  allResults.push(...filteredAndFormatted);\n}\n\nreturn allResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        576
+      ],
+      "id": "f2198db6-abdb-4e4b-accd-bdf9ce8fa263",
+      "name": "get important values1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items passed to the node\nconst allItems = items;\n\n// This will store each formatted record string\nlet combinedToon = [];\n\nallItems.forEach((item, index) => {\n  const obj = item.json;\n  let recordLines = [];\n  \n  // Start the record with the number (e.g., 1:)\n  recordLines.push(`${index + 1}:`);\n\n  for (const [key, value] of Object.entries(obj)) {\n    // Handling empty or null values gracefully\n    const displayValue = (value === null || value === \"\" || value === undefined) ? \"N/A\" : value;\n    \n    // Indent the keys for better readability under the record number\n    recordLines.push(`  ${key}: ${displayValue}`);\n  }\n  \n  // Join the lines for this specific record and add it to our array\n  combinedToon.push(recordLines.join('\\n'));\n});\n\n// Return a SINGLE item containing all records joined by double newlines\nreturn [\n  {\n    json: {\n      toon_output: combinedToon.join('\\n\\n')\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        576
+      ],
+      "id": "57c9bcd1-bb42-4933-a7fc-50fff056362f",
+      "name": "toon conv2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User: {{ $json.message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called }}\nTool Output: {{ $json.toon_output }}\nRequesting permition to call the update_person tool",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=You are the **CRM Entity Resolver**.\n\nYou receive:\n* The original user request\n* Query results from the CRM\n\nYour job is to decide whether it is safe to proceed.\n\n---\n\n### Hard Rules (VERY IMPORTANT)\n\n* You DO NOT execute tools directly.\n* You DO NOT modify data.\n* You ONLY decide **one of these outcomes**:\n\n  1. Execute with resolved ID\n  2. Refuse to execute (with reason)\n\n---\n\n### Decision Criteria\n\nYou may consider:\n* Name similarity\n* Company match\n* Job title relevance\n* Context alignment\n* Recency of last contact\n\n---\n\n### Allowed Decisions\n\nYou must return **one and only one** of the following:\n\n{\n  \"decision\": \"execute\",\n  \"confidence\": 0.82,\n  \"page_id\": \"resolved-page-id\",\n  \"reason\": \"Strong name + company + role match\"\n}\n\nOR\n\n{\n  \"decision\": \"refuse\",\n  \"confidence\": 0.45,\n  \"reason\": \"Multiple similar names, insufficient context to disambiguate safely\"\n}\n\n\n---\n\n### Absolute Prohibitions\n\n* Never guess an ID\n* Never say “probably”\n* Never allow execution if confidence < 0.7\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2560,
+        592
+      ],
+      "id": "8f226808-77a7-4e19-a590-8aa915f907fc",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        864
+      ],
+      "id": "1be9815f-7982-41ae-88bb-f274324032dc",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TppyipaFrqXqvcLE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        880
+      ],
+      "id": "10280d3e-c156-49cd-b04c-9cf17d601ff4",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "VqxrwHahgVrPESe1",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "execute",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0f434cc8-9892-4a72-b374-44e226604785"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "54de4827-d31a-4c80-a030-1be3184ac506",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "refuse",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        592
+      ],
+      "id": "b557e4d9-bd4f-49c7-a77d-139fcf3a657c",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {{ JSON.stringify($json.update_payload.properties) }}\n}",
+        "options": {}
+      },
+      "id": "a513b9b4-d73a-4f6d-ad2c-d20ecfe683b4",
+      "name": "Update Notion Page1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        3776,
+        592
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YInJN8tF12gDf6HM",
+          "name": "Header Auth account"
+        },
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Converts a JSON value to a token-efficient shorthand (TOON-style).\n * Strips quotes, uses simple indentation, and flattens structures.\n */\nfunction toTOON(val, indent = 0) {\n  const pad = ' '.repeat(indent);\n  \n  if (Array.isArray(val)) {\n    if (val.length === 0) return '[]';\n    return val.map(item => `\\n${pad}- ${toTOON(item, indent + 2)}`).join('');\n  }\n  \n  if (val !== null && typeof val === 'object') {\n    return Object.entries(val)\n      .filter(([_, v]) => v !== null && v !== undefined) // Skip nulls to save more tokens\n      .map(([k, v]) => `\\n${pad}${k}: ${toTOON(v, indent + 2)}`)\n      .join('');\n  }\n  \n  return String(val);\n}\n\n// Map through all incoming items from the previous n8n node\nreturn items.map(item => {\n  return {\n    json: {\n      toon_output: toTOON(item.json).trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4160,
+        592
+      ],
+      "id": "2640c633-b3a3-4164-bed9-8c0154a147df",
+      "name": "to TOON2"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2192,
+        576
+      ],
+      "id": "4fce18e6-0be9-4b51-90a2-1b319f3e4cb2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4448,
+        -1104
+      ],
+      "id": "4044a2ad-20cb-498f-b5d6-38317afa9f48",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003131045565",
+        "text": "={{ $json.formattedMessage }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5904,
+        -1104
+      ],
+      "id": "235c279a-62c2-4a08-ac53-033350a8f490",
+      "name": "Send a text message2",
+      "webhookId": "8a7d3f5d-388b-4545-b13a-6fa5838c8814",
+      "credentials": {
+        "telegramApi": {
+          "id": "sqhg2tmUTZEjGSGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  try {\n    const data = item.json; \n    \n    // 1. Build Header (Status and Confidence)\n    let headerLines = [\n      `Status: ${data.status || 'Unknown'}`,\n      `Confidence: ${data.confidence ? (data.confidence * 100).toFixed(0) : 0}%`\n    ];\n\n    // 2. Scan for metadata URLs (top-level properties)\n    for (const [key, value] of Object.entries(data)) {\n      if (typeof value === 'string' && value.startsWith('http')) {\n        const cleanKey = key.replace(/_/g, ' ');\n        headerLines.push(`${cleanKey}: <a href=\"${value}\">View</a>`);\n      }\n    }\n\n    // 3. Process the main Message body to find and format links\n    let messageBody = data.message || '';\n    \n    // Regex to find URLs\n    const urlRegex = /(https?:\\/\\/[^\\s]+)/g;\n    \n    messageBody = messageBody.replace(urlRegex, (url) => {\n      const lowerUrl = url.toLowerCase();\n      let label = \"View Website\"; // Default\n\n      if (lowerUrl.includes(\"notion.so\")) {\n        label = \"View in Notion\";\n      } else if (lowerUrl.includes(\"linkedin.com\")) {\n        label = \"View in LinkedIn\";\n      } else if (lowerUrl.includes(\"twitter.com\") || lowerUrl.includes(\"x.com\")) {\n        label = \"View in X/Twitter\";\n      }\n\n      return `<a href=\"${url}\">${label}</a>`;\n    });\n\n    // 4. Handle Reason\n    let reasonSection = \"\";\n    if (data.reason && String(data.reason).trim() !== \"null\" && String(data.reason).trim() !== \"\") {\n      reasonSection = `\\n\\n<i>(Reason: ${data.reason})</i>`;\n    }\n\n    // 5. Combine into final Telegram HTML format\n    const finalMessage = `<blockquote>${headerLines.join('\\n')}</blockquote>\\n\\n${messageBody}${reasonSection}`;\n\n    // Set the output\n    item.json.formattedMessage = finalMessage;\n\n  } catch (e) {\n    item.json.formattedMessage = `Error formatting message: ${e.message}`;\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5648,
+        -1104
+      ],
+      "id": "216b826f-bf6d-41a1-ad96-596b2d1eb046",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3376,
+        368
+      ],
+      "id": "55ba51f2-cfc0-423c-b97b-aa8c5c55bf67",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "90f2c5c3-2446-4a14-ad3a-ae69efe7a5f1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -3248,
+        -192
+      ],
+      "webhookId": "2be117d6-5e4c-44ed-b84b-f2668b41a1f0",
+      "credentials": {
+        "telegramApi": {
+          "id": "sqhg2tmUTZEjGSGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "recived an image",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2496,
+        352
+      ],
+      "id": "88243f3a-861e-4bc0-a8d3-17bc8206f9cb",
+      "name": "Send a text message6",
+      "webhookId": "d257a9a5-f717-446b-8679-fcaa2e9f6e6a",
+      "credentials": {
+        "telegramApi": {
+          "id": "sqhg2tmUTZEjGSGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Sorry you are not elegible to use this bot",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -3008,
+        96
+      ],
+      "id": "257cbbd8-8808-4bc4-8f49-30a49810d3cb",
+      "name": "not eligable",
+      "webhookId": "d257a9a5-f717-446b-8679-fcaa2e9f6e6a",
+      "credentials": {
+        "telegramApi": {
+          "id": "sqhg2tmUTZEjGSGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a9e196c7-fd2f-4db6-8f32-2aacee34ca82",
+              "leftValue": "={{ $json.message.chat.id }}",
+              "rightValue": -1003131045565,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2976,
+        -192
+      ],
+      "id": "2d903b1c-8bd5-4ffb-9dd1-e11fe18cf552",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1ac1ccde-b15a-470a-be44-9acedb20bf3c",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "eb8a49e8-ea46-4462-b6cf-7cb5550aacfa"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b0312b67-c9cd-48a9-a9e3-550ac44a27b4",
+                    "leftValue": "={{ $json.message.photo }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "array",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2736,
+        -176
+      ],
+      "id": "3bf718c9-c133-4c56-95a3-d16cb6a73570",
+      "name": "Switch2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1648,
+        -208
+      ],
+      "id": "37c7897a-ba94-4d62-b8e9-1f26b8edb574",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  try {\n    const parsedOutput = JSON.parse(item.json.output);\n    const f = parsedOutput.fields || {};\n\n    // For Rich Text: Notion requires a string (even if empty)\n    const toStr = (val) => (val ? String(val) : \"\");\n\n    // For Email/Select/Date: Notion requires null if empty\n    const toNull = (val) => (val && val !== \"\" ? val : null);\n\n    results.push({\n      json: {\n        cleanFields: {\n          name: toStr(f.Name) || \"No Name Provided\",\n          context: toStr(f.Context), // Fix for your error\n          company: toStr(f.Company), // Fix for your error\n          location: toStr(f.Location), // Fix for your error\n          notes: toStr(f.Notes), // Fix for your error\n          email: toNull(f.Email),\n          enriched: !!f.Enriched,\n          industry: toNull(f.Industry),\n          status: toNull(f.Status) || \"Backlog\",\n          linkedIn: toNull(f[\"LinkedIn URL\"]),\n          followUp: toNull(f[\"Follow-up Reminder\"]),\n          lastContact: toNull(f[\"Last Contact Date\"])\n        }\n      }\n    });\n  } catch (e) {\n    continue;\n  }\n}\n\nreturn results;"
+      },
+      "id": "7c727548-cd13-49d1-a41b-a892842a6b68",
+      "name": "Clean & Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "f2fbf211b5fe49e8b5cc6cf68138f96b",
+          "mode": "id"
+        },
+        "title": "={{ $json.cleanFields.name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{ $json.cleanFields.name }}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $json.cleanFields.email }}"
+            },
+            {
+              "key": "Company|rich_text",
+              "textContent": "={{ $json.cleanFields.company }}"
+            },
+            {
+              "key": "Context|rich_text",
+              "textContent": "={{ $json.cleanFields.context }}"
+            },
+            {
+              "key": "Enriched|checkbox",
+              "checkboxValue": "={{ $json.cleanFields.enriched }}"
+            },
+            {
+              "key": "Industry|select",
+              "selectValue": "={{ $json.cleanFields.industry }}"
+            },
+            {
+              "key": "LinkedIn URL|url",
+              "urlValue": "={{ $json.cleanFields.linkedIn }}"
+            },
+            {
+              "key": "Status|status",
+              "statusValue": "={{ $json.cleanFields.status }}"
+            },
+            {
+              "key": "Location|rich_text",
+              "textContent": "={{ $json.cleanFields.location }}"
+            },
+            {
+              "key": "Notes|rich_text",
+              "textContent": "={{ $json.cleanFields.notes }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0e33c9b-c1f3-4896-8717-0972ebf84b90",
+      "name": "Notion People1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -208
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "MUQPH2wbr0FtcPyn",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User: {{ $json.message?.text || $json.text }}\nCalled Tool Name: {{ $json.tool_called || 'None' }}\nTool Output: {{ $json.toon_output || 'None' }}\nReason: {{ $json.reason || 'None' }}",
+        "options": {
+          "systemMessage": "=# 🧠 PROMPT 3 — FINAL AI (Validator / Narrator)\n\nYou are the **Final CRM Communicator**.\n\nYou receive:\n* Tool execution results (or none)\n* Errors (if any)\n* Resolver decisions\n\nYour job is to:\n* Validate what actually happened\n* Communicate clearly to the user\n* Never hallucinate success\n\n---\n\n### Hard Rules\n\n* If **no execution output exists** → status MUST be `\"Failure\"`\n* Never say an update happened unless verified\n* Always explain failure reasons clearly\n* Be concise, confident, and human\n* URL Inclusion: If the tool output contains a person_url or similar profile link, you must include it in your final message to the user.\n\n---\n\n### Output Tool\n\nAlways respond using `send_final_msg`.\n\nExample (success):\n\n{\n  \"tool\": \"send_final_msg\",\n  \"status\": \"Success\",\n  \"confidence\": 0.9,\n  \"message\": \"✅ Oram Ahmed’s profile was updated: Job Title set to VP of Sales.\",\n  \"reason\": null\n}\n\nExample (failure):\n\n{\n  \"tool\": \"send_final_msg\",\n  \"status\": \"Failure\",\n  \"confidence\": 0.4,\n  \"message\": \"⚠️ I found multiple similar contacts and couldn’t confidently determine the correct one.\",\n  \"reason\": \"Ambiguous match; no safe resolution\"\n}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4912,
+        -1104
+      ],
+      "id": "71a0bc02-0865-4ec6-a33b-37346760ddce",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        5040,
+        -768
+      ],
+      "id": "d0682ff8-3b4e-49da-8b5d-ca7f996e6caf",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TppyipaFrqXqvcLE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "moonshotai/kimi-k2-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        4816,
+        -816
+      ],
+      "id": "d31ad9f7-7028-48f7-a129-dc5bfdb11436",
+      "name": "Groq Chat Model2",
+      "credentials": {
+        "groqApi": {
+          "id": "VqxrwHahgVrPESe1",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"create_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        -208
+      ],
+      "id": "e9e4167d-4be8-4e87-ad33-cfc4d99c257b",
+      "name": "append tool name"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Check if output exists to avoid errors\n  if (item.json.output) {\n    try {\n      // Parse the string inside \"output\" into a real JSON object\n      const cleanedData = JSON.parse(item.json.output);\n      \n      // Replace the item's content with the cleaned JSON\n      item.json = cleanedData;\n    } catch (error) {\n      // If parsing fails, we keep the original and add an error flag\n      item.json.error = \"Invalid JSON string\";\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5312,
+        -1104
+      ],
+      "id": "e2abaf93-7aa9-4edd-b7f7-9bedd4daea30",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"get_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        -448
+      ],
+      "id": "1b191496-f41b-4442-8286-dc9f58f88bf2",
+      "name": "append tool name1"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Check if output exists to avoid errors\n  if (item.json.output) {\n    try {\n      // Parse the string inside \"output\" into a real JSON object\n      const cleanedData = JSON.parse(item.json.output);\n      \n      // Replace the item's content with the cleaned JSON\n      item.json = cleanedData;\n    } catch (error) {\n      // If parsing fails, we keep the original and add an error flag\n      item.json.error = \"Invalid JSON string\";\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -448
+      ],
+      "id": "574c2d51-4408-4d4c-b703-5d4f07382db3",
+      "name": "clean"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Check if output exists to avoid errors\n  if (item.json.output) {\n    try {\n      // Parse the string inside \"output\" into a real JSON object\n      const cleanedData = JSON.parse(item.json.output);\n      \n      // Replace the item's content with the cleaned JSON\n      item.json = cleanedData;\n    } catch (error) {\n      // If parsing fails, we keep the original and add an error flag\n      item.json.error = \"Invalid JSON string\";\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        16
+      ],
+      "id": "5fa28e7e-fa22-44e3-b5f9-3aaf62707ce2",
+      "name": "clean1"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Check if output exists to avoid errors\n  if (item.json.output) {\n    try {\n      // Parse the string inside \"output\" into a real JSON object\n      const cleanedData = JSON.parse(item.json.output);\n      \n      // Replace the item's content with the cleaned JSON\n      item.json = cleanedData;\n    } catch (error) {\n      // If parsing fails, we keep the original and add an error flag\n      item.json.error = \"Invalid JSON string\";\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        240
+      ],
+      "id": "acb586b1-4472-4f9c-8b07-2a29660da5fa",
+      "name": "clean2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"update_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        16
+      ],
+      "id": "81e4bcca-8b78-4513-bb03-4ed6c0a21925",
+      "name": "append tool name2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"query_people\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        240
+      ],
+      "id": "99f98d39-6cb8-4722-9f52-40f27ff2e480",
+      "name": "append tool name3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"query_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        576
+      ],
+      "id": "02726f31-5693-4bce-bf57-4576187c8ec0",
+      "name": "append tool name4"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Check if output exists to avoid errors\n  if (item.json.output) {\n    try {\n      // Parse the string inside \"output\" into a real JSON object\n      const cleanedData = JSON.parse(item.json.output);\n      \n      // Replace the item's content with the cleaned JSON\n      item.json = cleanedData;\n    } catch (error) {\n      // If parsing fails, we keep the original and add an error flag\n      item.json.error = \"Invalid JSON string\";\n    }\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        576
+      ],
+      "id": "35ee68f1-2ab2-4b41-8059-4f8f3b25bf4c",
+      "name": "clean data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to format dates to \"MMM DD, YYYY\"\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// n8n uses $input.all() to get incoming data\nconst items = $input.all();\nlet allResults = [];\n\nfor (const item of items) {\n  const page = item.json;\n  \n  // Skip if in trash\n  if (page.in_trash) continue;\n\n  const props = page.properties || {};\n\n  // Map to clean structure\n  allResults.push({\n    id: page.id,\n    notion_url: page.url,\n    created_time: formatDate(page.created_time),\n    last_edited_time: formatDate(page.last_edited_time),\n\n    // Properties\n    industry: props.Industry?.select?.name || null,\n    email: props.Email?.email || null,\n    linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n    phone: props.Phone?.phone_number || null,\n    \n    // Rich Text & Title (using .map and .join safely)\n    notes: (props.Notes?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    tags: (props.Tags?.multi_select || []).map(s => s.name).join(\", \"),\n    \n    status: props.Status?.status?.name || null,\n    last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n    context: (props.Context?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    job_title: (props[\"Job Title\"]?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n    enriched: props.Enriched?.checkbox || false,\n    company: (props.Company?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    location: (props.Location?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    name: (props.Name?.title || []).map(t => t.plain_text).join(\"\")\n  });\n}\n\n// Return as objects; n8n will wrap them in .json automatically\nreturn allResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        16
+      ],
+      "id": "4d7ea408-8044-4041-8983-a6a9891a2491",
+      "name": "get impo values"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the string from the previous node\nlet text = $json.output;\n\nif (typeof text === 'string') {\n  // 2. Remove the opening ```json or ``` and the closing ```\n  // This regex looks for the markers at the start and end\n  text = text.replace(/^```json|```/g, \"\").trim();\n}\n\n// 3. Return the raw \"cleaned\" string\nreturn {\n  output: text\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -112
+      ],
+      "id": "19bde299-ae71-4a0a-afe3-0dad1fcdcbe3",
+      "name": "remove potenital json block"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the raw output from the previous node\nlet rawOutput = $json.output;\n\n// 1. Check if the output is a string and contains markdown backticks\nif (typeof rawOutput === 'string' && rawOutput.includes(\"```\")) {\n  // 2. Use regex to strip the ```json and ``` markers\n  rawOutput = rawOutput.replace(/```json|```/g, \"\").trim();\n}\n\ntry {\n  // 3. Parse the cleaned string back into a real JSON object\n  const cleanedData = JSON.parse(rawOutput);\n  return cleanedData;\n} catch (e) {\n  // Fallback if the AI output was already clean or slightly different\n  return { \n    error: \"Failed to parse JSON\", \n    original: $json.output \n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        592
+      ],
+      "id": "9eeb1144-dcec-461f-bd7a-3fa428130dd6",
+      "name": "clean3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to format dates to \"MMM DD, YYYY\"\nconst formatDate = (dateString) => {\n  if (!dateString) return null;\n  const date = new Date(dateString);\n  return new Intl.DateTimeFormat('en-US', {\n    month: 'short',\n    day: 'numeric',\n    year: 'numeric'\n  }).format(date);\n};\n\n// n8n uses $input.all() to get incoming data\nconst items = $input.all();\nlet allResults = [];\n\nfor (const item of items) {\n  const page = item.json;\n  \n  // Skip if in trash\n  if (page.in_trash) continue;\n\n  const props = page.properties || {};\n\n  // Map to clean structure\n  allResults.push({\n    id: page.id,\n    notion_url: page.url,\n    created_time: formatDate(page.created_time),\n    last_edited_time: formatDate(page.last_edited_time),\n\n    // Properties\n    industry: props.Industry?.select?.name || null,\n    email: props.Email?.email || null,\n    linkedin_url: props[\"LinkedIn URL\"]?.url || null,\n    phone: props.Phone?.phone_number || null,\n    \n    // Rich Text & Title (using .map and .join safely)\n    notes: (props.Notes?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    tags: (props.Tags?.multi_select || []).map(s => s.name).join(\", \"),\n    \n    status: props.Status?.status?.name || null,\n    last_contact_date: formatDate(props[\"Last Contact Date\"]?.date?.start),\n    context: (props.Context?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    job_title: (props[\"Job Title\"]?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    follow_up_reminder: formatDate(props[\"Follow-up Reminder\"]?.date?.start),\n    enriched: props.Enriched?.checkbox || false,\n    company: (props.Company?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    location: (props.Location?.rich_text || []).map(t => t.plain_text).join(\" \"),\n    name: (props.Name?.title || []).map(t => t.plain_text).join(\"\")\n  });\n}\n\n// Return as objects; n8n will wrap them in .json automatically\nreturn allResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3984,
+        592
+      ],
+      "id": "4693ccd7-67b7-4e71-8799-891d1557da18",
+      "name": "get impor valiues"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n// Loop through all incoming items\nfor (const item of $input.all()) {\n  // Create a new object with the new key at the top\n  // Then spread the existing data after it\n  item.json = {\n    tool_called: \"query_then_update_person\",\n    ...item.json\n  };\n}\n\nreturn $input.all();\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4368,
+        592
+      ],
+      "id": "cb58c38c-d401-4a82-98cf-d14ff8596d62",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to recursively crawl the object and lowercase \"contains\" values\nfunction lowercaseContains(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseContains(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'contains' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseContains(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseContains(item.json)\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        240
+      ],
+      "id": "4e18235c-6d9c-44e9-be98-f3f6186e06cd",
+      "name": "contians value to lowercase"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to recursively crawl the object and lowercase \"contains\" values\nfunction lowercaseContains(obj) {\n  if (Array.isArray(obj)) {\n    return obj.map(item => lowercaseContains(item));\n  } else if (typeof obj === 'object' && obj !== null) {\n    const newObj = {};\n    for (const key in obj) {\n      if (key === 'contains' && typeof obj[key] === 'string') {\n        newObj[key] = obj[key].toLowerCase();\n      } else {\n        newObj[key] = lowercaseContains(obj[key]);\n      }\n    }\n    return newObj;\n  }\n  return obj;\n}\n\n// Loop through all items incoming from the previous node\nreturn items.map(item => {\n  return {\n    json: lowercaseContains(item.json)\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        688
+      ],
+      "id": "3a6adc83-6e59-4fde-a5a3-a71dc9cb37d4",
+      "name": "contians value to lowercase1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "groqApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-large-v3-turbo"
+            },
+            {
+              "name": "temperature",
+              "value": "0"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "name": "url",
+              "value": "=https://api.telegram.org/file/bot8446337809:AAHSl3VWDRyBt6WaW7aAzc4Xma_0s1_kflQ/{{ $json.result.file_path }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2112,
+        -96
+      ],
+      "id": "1cdc2d92-62cc-4021-9b05-8f6877ff7b32",
+      "name": "groq STT",
+      "credentials": {
+        "groqApi": {
+          "id": "VqxrwHahgVrPESe1",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot8446337809:AAHSl3VWDRyBt6WaW7aAzc4Xma_0s1_kflQ/getFile?file_id={{ $json.message.voice.file_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2304,
+        -96
+      ],
+      "id": "262e74e6-79a1-4a02-b86e-a81288c987c5",
+      "name": "get voice file path"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/file/bot8446337809:AAHSl3VWDRyBt6WaW7aAzc4Xma_0s1_kflQ/voice/file_6.oga",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2672,
+        -768
+      ],
+      "id": "14304578-aeda-4475-99e4-793d171fa872",
+      "name": "HTTP Request",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "text": "=you will get an input as an audio\n\nwhat we are doing is this:\n# AI Second Brain\n\n## Core Philosophy\nYou are the \"Sorter\" in an AI Second Brain system. Your goal is to offload the burden of organization from the user. You must process raw, frictionless thoughts captured by the user and route them into a structured memory system (Notion).\n\n## Your Mission\n1. **Analyze** the user's incoming message.\n2. **Categorize** it into one of four buckets: **People, Projects, Ideas, or Admin**.\n3. **Extract** relevant fields based on the specific database schemas below.\n4. **Evaluate** your confidence.\n\n---\n\n## Database Schemas & Mapping\n\n### 1. People (Relationships & Network)\nUse this for: Managing professional and personal contacts, tracking outreach, and maintaining context on network relationships.\n\n**Database Properties:**\n- **Title**: Appears at the top of the page and can be found via Quick Find.\n* **Name:** The primary name of the individual.\n* **Company:** Current organization or employer.\n* **Email:** Professional or personal email address.\n* **Phone:** Contact number.\n* **Job Title:** The person's specific role.\n* **Industry:** The professional sector they belong to.\n* **LinkedIn URL:** Direct link to their professional profile.\n* **Location:** City or region.\n* **Context:** Summary of who they are and the nature of the relationship.\n* **Notes:** Detailed interaction logs or miscellaneous information.\n* **Tags:** Categories like \"Work,\" \"Personal,\" etc.\n* **Status:** Status is required, i will tell you the options below\n* **Follow-up Reminder:** Date set for future outreach.\n* **Last Contact Date:** The last time interaction occurred.\n* **Enriched:** Checkbox indicating if the profile data has been enhanced.\n\n**DATE FORMATTING:**\nAll date fields (Follow-up Reminder, Last Contact Date) must be formatted exactly as follows for Notion API compatibility:\n* **Format:** `dddd, MMMM D, YYYY`\n* **Example:** `Wednesday, January 28, 2022`\n\n**STRICT STATUS PROPERTY VALUES:**\nWhen setting or updating the \"Status\" field, you must use these exact strings. Do not use any other variations:\n* **To reach out**\n* **In conversation**\n* **Connected**\n* **Not a fit**\n\n### 2. Projects (Active Endeavors)\n*Use this for: Goals requiring multiple steps. Focus on actions.*\n- **Title**: Appears at the top of the page and can be found via Quick Find.\n- **Name**: Clear project title.\n- **Status**: Active, Waiting, Blocked, Someday, or Done.\n- **Next-Action**: A concrete, executable task (e.g., \"Email Sarah\").\n- **Notes**: Extracted context and details.\n\n### 3. Ideas (Insights & Aha! moments)\n*Use this for: Raw insights and creative thoughts.*\n- **Title**: Appears at the top of the page and can be found via Quick Find.\n- **Name**: A catchy/clear title.\n- **One-liner**: A single sentence capturing the core insight.\n- **Notes**: The full detailed thought.\n- **Tags**: Topic categories.\n\n### 4. Admin (Errands & Minor Tasks)\n*Use this for: One-off tasks or miscellaneous to-dos.*\n- **Title**: Appears at the top of the page and can be found via Quick Find.\n- **Name**: The task name.\n- **Due-Date**: If mentioned, extract the date. IT MUST BE IN ISO FORMAT CONVERT IT IF IT IS NOT.\n- **Status**: MUST be one of those: [\"Back Log\", \"Todo\", \"In Progress\", \"Complete\"] EXACTLY as they are fromated\n\n---\n\n## Response Logic & Output Format\n\nYou must return a JSON object. The structure depends on your **Confidence Score (0.0 - 1.0)**.\n\n### IF CONFIDENCE IS > 0.7:\nReturn the structured data for the chosen category and a success message.\n\n{\n  \"category\": \"people | projects | ideas | admin\",\n  \"confidence\": 0.95,\n  \"fields\": {\n    \"title\": \"title\",\n    \"relevant_field_1\": \"data\",\n    \"relevant_field_2\": \"data\"\n  },\n  \"message\": \"✅ Filed as [Category]: [Summary of what you did].\"\n}\n\n\n### IF CONFIDENCE IS <= 0.7:\nDo not attempt to file the data. Instead, ask for clarification.\n\n{\n  \"category\": \"needs_review\",\n  \"confidence\": 0.45,\n  \"fields\": {},\n  \"message\": \"❓ I'm not entirely sure how to file this. [Explain what was confusing]. Could you please clarify [tell the user what you want to clarify]?\"\n}\n\n\n## Constraints\n- **Frictionless**: Extract as much as possible from short, messy inputs.\n- **Must fill all the database fields**: if there is one you did not thought it is needed, keep it in the json and put its value to None.\n- **Action-Oriented**: Always prioritize \"Next Actions\" over vague intentions for Projects.\n- **No Markdown**: Return ONLY the raw JSON object without a code block.\n- **No Code Bllocks**: Return ONLY the raw JSON object, with no MD Code Block.\n- **Today's Date & Time**: always use Today's date and time, here is it {{ $now.toFormat('DDDD') }}",
+        "inputType": "binary",
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -2256,
+        -768
+      ],
+      "id": "ddcc1f82-124a-4ded-bf89-c72b89c68651",
+      "name": "Analyze audio",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TppyipaFrqXqvcLE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the existing binary data\nconst binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\n\nreturn {\n  json: {\n    message: \"Transcribe this audio clip\"\n  },\n  binary: {\n    data: {\n      data: binaryData.toString('base64'),\n      mimeType: 'audio/mp3', // We \"lie\" to Gemini here to make it accept the buffer\n      fileName: 'audio.mp3'\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2464,
+        -768
+      ],
+      "id": "456104bc-49c1-470e-b818-c2e50281adf0",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through every item passing through the node\nreturn items.map(item => {\n  try {\n    // Navigate the new nested structure: content -> parts -> [0] -> text\n    const newText = item.json.content.parts[0].text;\n\n    return {\n      json: {\n        output: newText\n      }\n    };\n  } catch (error) {\n    // In case an item doesn't match the new format, return an error flag or empty object\n    return {\n      json: {\n        error: \"Could not parse new format\",\n        details: error.message\n      }\n    };\n  }\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2048,
+        -768
+      ],
+      "id": "f1834805-9f31-4074-aa08-df2462463ff0",
+      "name": "Code in JavaScript5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get person by id": {
+      "main": [
+        [
+          {
+            "node": "toon conv1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Notion Database": {
+      "main": [
+        [
+          {
+            "node": "get important values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get important values": {
+      "main": [
+        [
+          {
+            "node": "toon conv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "clean",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean & Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "clean1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "clean2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "clean data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion Page": {
+      "main": [
+        [
+          {
+            "node": "get impo values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "remove potenital json block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Notion Database1": {
+      "main": [
+        [
+          {
+            "node": "get important values1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get important values1": {
+      "main": [
+        [
+          {
+            "node": "toon conv2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toon conv2": {
+      "main": [
+        [
+          {
+            "node": "append tool name4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "clean3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion Page1": {
+      "main": [
+        [
+          {
+            "node": "get impor valiues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toon conv1": {
+      "main": [
+        [
+          {
+            "node": "append tool name1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "to TOON": {
+      "main": [
+        [
+          {
+            "node": "append tool name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "to TOON1": {
+      "main": [
+        [
+          {
+            "node": "append tool name2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "toon conv": {
+      "main": [
+        [
+          {
+            "node": "append tool name3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "to TOON2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Page1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Switch2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "not eligable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch2": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get voice file path",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean & Validate": {
+      "main": [
+        [
+          {
+            "node": "Notion People1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion People1": {
+      "main": [
+        [
+          {
+            "node": "to TOON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Groq Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "append tool name": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "append tool name1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "clean": {
+      "main": [
+        [
+          {
+            "node": "Get person by id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean1": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean2": {
+      "main": [
+        [
+          {
+            "node": "contians value to lowercase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "append tool name2": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "append tool name3": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "append tool name4": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "clean data": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "contians value to lowercase1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impo values": {
+      "main": [
+        [
+          {
+            "node": "to TOON1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "remove potenital json block": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean3": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get impor valiues": {
+      "main": [
+        [
+          {
+            "node": "to TOON2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "contians value to lowercase": {
+      "main": [
+        [
+          {
+            "node": "Query Notion Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "contians value to lowercase1": {
+      "main": [
+        [
+          {
+            "node": "Query Notion Database1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get voice file path": {
+      "main": [
+        [
+          {
+            "node": "groq STT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "groq STT": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze audio": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Analyze audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "YgQMQ2K8IXbIqztxtd-Mr"
+  },
+  "versionId": "dbc6b6b4-9b2d-47a2-a109-8060090d5be0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "65d1a339b442578b9f48438a32f521de239e91fb025b2f8c26e5d9e359ded7b8"
+  },
+  "id": "dli-Lw0NvpMNHIWTCffSy",
+  "tags": [
+    {
+      "updatedAt": "2026-02-02T14:19:10.343Z",
+      "createdAt": "2026-02-02T14:19:10.343Z",
+      "id": "PtInofDqy6UoRVMg",
+      "name": "voice"
+    },
+    {
+      "updatedAt": "2026-01-21T11:31:34.385Z",
+      "createdAt": "2026-01-21T11:31:34.385Z",
+      "id": "e4ix3M1lJMuhr7l6",
+      "name": "dev"
+    }
+  ]
+}

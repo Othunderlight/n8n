@@ -1983,6 +1983,19 @@
       ],
       "id": "d6f4114e-fe28-4f10-9f85-52322c8f5a03",
       "name": "get impo values2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message text while maintaining the same structure\nconst items = $input.all();\n\n// Process each item in the input\nconst result = items.map(item => {\n  // Check if the item has a message with text\n  if (item.json.message && item.json.message.text) {\n    // Create a new item with the same structure but only text in message\n    return {\n      json: {\n        // update_id: item.json.update_id,\n        message: {\n          // message_id: item.json.message.message_id,\n          text: item.json.message.text\n        }\n      }\n    };\n  }\n  return item; // Return original item if no text found\n});\n\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        -1056
+      ],
+      "id": "555b7dfd-cf9d-41bb-b345-6a08a31a6826",
+      "name": "get_text_only"
     }
   ],
   "pinData": {},
@@ -2334,12 +2347,12 @@
             "index": 0
           },
           {
-            "node": "Merge1",
+            "node": "Merge",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Merge",
+            "node": "get_text_only",
             "type": "main",
             "index": 0
           }
@@ -3028,6 +3041,17 @@
           }
         ]
       ]
+    },
+    "get_text_only": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -3038,7 +3062,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": "YgQMQ2K8IXbIqztxtd-Mr"
   },
-  "versionId": "0fccf2de-b12c-4f43-8d7e-c513769f4313",
+  "versionId": "7d014da2-fd66-4b34-8d2e-552fd9517177",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "65d1a339b442578b9f48438a32f521de239e91fb025b2f8c26e5d9e359ded7b8"

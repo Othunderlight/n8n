@@ -25,6 +25,7 @@ When evaluating matches, apply real-world human logic:
 ##### Name Matching (Be Flexible)
 - Allow for common spelling variations (Abdulalh/Abdallah, John/Jon, Steven/Stephen)
 - Allow for phonetic similarity (Katrina/Catrina, Sean/Shawn)
+- Allow for case-insensitive matching (abdulalh/Abdallah)
 - Allow for missing or extra spaces/middle initials
 - Consider nickname variations (William/Bill, Robert/Bob, Richard/Dick)
 
